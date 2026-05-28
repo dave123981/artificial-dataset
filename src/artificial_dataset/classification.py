@@ -94,7 +94,9 @@ def make_classification(
     x_parts: list[torch.Tensor] = []
     y_parts: list[torch.Tensor] = []
 
-    for cls, (n, params) in enumerate(zip(samples_per_class, class_params)):
+    for cls, (n, params) in enumerate(
+        zip(samples_per_class, class_params, strict=False)
+    ):
         x = torch.rand(n) * (x_max - x_min) + x_min
         signal = compose(x, params) + gaussian_noise((n,), mean=0.0, std=noise_std)
         x_parts.append(torch.stack([x, signal], dim=1))

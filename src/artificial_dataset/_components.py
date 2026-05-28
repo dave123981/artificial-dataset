@@ -5,7 +5,9 @@ from typing import Any
 import torch
 
 
-def gaussian_noise(size: tuple[int, ...], mean: float = 0.0, std: float = 1.0) -> torch.Tensor:
+def gaussian_noise(
+    size: tuple[int, ...], mean: float = 0.0, std: float = 1.0
+) -> torch.Tensor:
     """Generate a tensor of Gaussian noise.
 
     Parameters
@@ -98,9 +100,9 @@ def compose(x: torch.Tensor, params: dict[str, Any]) -> torch.Tensor:
 
     Recognised keys in *params* and their expected value types:
 
-    * ``"linear"``      – ``dict`` of keyword arguments for :func:`linear`
-    * ``"polynomial"``  – ``dict`` of keyword arguments for :func:`polynomial`
-    * ``"sinusoidal"``  – ``dict`` of keyword arguments for :func:`sinusoidal`
+    * ``"linear"``      - ``dict`` of keyword arguments for :func:`linear`
+    * ``"polynomial"``  - ``dict`` of keyword arguments for :func:`polynomial`
+    * ``"sinusoidal"``  - ``dict`` of keyword arguments for :func:`sinusoidal`
 
     Unknown keys are silently ignored so callers can attach metadata to the
     same dict without interfering with signal generation.

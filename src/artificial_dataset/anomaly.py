@@ -75,9 +75,7 @@ def make_anomaly_dataset(
     50
     """
     if not 0.0 < anomaly_fraction < 1.0:
-        raise ValueError(
-            f"anomaly_fraction must be in (0, 1), got {anomaly_fraction}"
-        )
+        raise ValueError(f"anomaly_fraction must be in (0, 1), got {anomaly_fraction}")
 
     if random_state is not None:
         torch.manual_seed(random_state)
@@ -99,18 +97,18 @@ def make_anomaly_dataset(
         (n_anomalies,), mean=0.0, std=noise_std * anomaly_scale
     )
 
-    X = torch.cat(
+    features = torch.cat(
         [
             torch.stack([x_normal, signal_normal], dim=1),
             torch.stack([x_anomaly, signal_anomaly], dim=1),
         ],
         dim=0,
     )
-    y = torch.cat(
+    labels = torch.cat(
         [
             torch.zeros(n_normal, dtype=torch.long),
             torch.ones(n_anomalies, dtype=torch.long),
         ],
         dim=0,
     )
-    return X, y
+    return features, labels
