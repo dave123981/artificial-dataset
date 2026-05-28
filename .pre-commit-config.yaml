@@ -41,6 +41,7 @@ repos:
     hooks:
       - id: nbqa-ruff
         additional_dependencies: [ruff]
+        args: ["--extend-ignore=D100,I001"]
 
   # --- Mypy (type checking) ---
   - repo: https://github.com/pre-commit/mirrors-mypy

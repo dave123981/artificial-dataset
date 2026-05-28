@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "artificial-dataset"
 version = "0.0.1"
-description = "Edge detection with custom convolution kernel."
+description = "Artificial dataset generation from Gaussian noise, linear, polynomial, and sinusoidal components."
 readme = "README.md"
 license = "GPL-3.0"
 license-files = ["LICENSE*"]
@@ -22,9 +22,10 @@ requires-python = ">=3.10"
 
 keywords = [
     "pytorch",
-    "image processing",
-    "edge detection",
-    "convolution"
+    "dataset generation",
+    "classification",
+    "anomaly detection",
+    "signal processing"
 ]
 
 classifiers = [
@@ -63,7 +64,7 @@ package-dir = {"" = "src"}
 # --------------------------------------------------
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["create_kernel", "image_processing"]
+include = ["artificial_dataset"]
 
 [tool.pytest.ini_options]
 
