@@ -17,7 +17,7 @@ authors = [
     {name = "Balazs Paszkal Halmos"}
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 
 keywords = [
     "pytorch",
@@ -96,7 +96,7 @@ omit = [
 [tool.black]
 
 line-length = 88
-target-version = ["py314"]
+target-version = ["py312"]
 
 # --------------------------------------------------
 # Ruff linter
@@ -130,6 +130,6 @@ convention = "numpy"
 
 [tool.mypy]
 
-python_version = "3.14"
+python_version = "3.12"
 strict = true
 ignore_missing_imports = true
