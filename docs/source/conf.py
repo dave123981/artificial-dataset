@@ -54,6 +54,7 @@ html_theme = "pydata_sphinx_theme"
 html_theme_options = {
     "navigation_depth": 2,
     "show_toc_level": 2,
+    "navbar_align": "left",
 }
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
