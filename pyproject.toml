@@ -61,14 +61,11 @@ dependencies = {file = ["requirements.txt"]}
 dev = {file = ["requirements-dev.txt"]}
 docs = {file = ["requirements-docs.txt"]}
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
 # --------------------------------------------------
 # Pytest configuration
 # --------------------------------------------------
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 include = ["artificial_dataset"]
 
 [tool.pytest.ini_options]
@@ -89,7 +86,7 @@ addopts = [
 
 [tool.coverage.run]
 
-source = ["src"]
+source = ["artificial_dataset"]
 
 omit = [
     "tests/*"

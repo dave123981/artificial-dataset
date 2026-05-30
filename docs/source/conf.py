@@ -9,7 +9,7 @@ import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
-sys.path.insert(0, os.path.abspath("../../src"))
+sys.path.insert(0, os.path.abspath("../.."))
 
 
 # -- Project information -----------------------------------------------------
