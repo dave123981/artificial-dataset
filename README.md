@@ -136,7 +136,7 @@ xdg-open https://github.com/dcintlab/artificial-dataset/pull/new/feature/your-aw
 git switch main
 git pull
 git branch -d feature/your-awesome-feature
-git push origin --delete feature/your-awesome-feature
+git branch -d feature/your-awesome-feature --remote
 ```
 
 ## License
