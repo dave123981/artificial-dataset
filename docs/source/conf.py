@@ -57,5 +57,3 @@ html_theme_options = {
 }
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
-
-html_static_path = ["_static"]

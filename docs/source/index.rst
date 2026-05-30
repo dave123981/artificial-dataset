@@ -1,15 +1,17 @@
-.. artificial-dataset documentation master file, created by
-   sphinx-quickstart on Sat May 30 13:31:07 2026.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+artificial-dataset
+==================
 
-Welcome to the documentation!
-=============================
-
-Project for generating an artificial dataset.
+Artificial dataset generation from Gaussian noise, linear, polynomial, and
+sinusoidal components.  The package provides two high-level generators —
+:func:`~artificial_dataset.make_classification` and
+:func:`~artificial_dataset.make_anomaly_dataset` — that return
+:class:`torch.Tensor` objects ready for use in PyTorch training loops.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   installation
+   usage
+   development
    api/modules
