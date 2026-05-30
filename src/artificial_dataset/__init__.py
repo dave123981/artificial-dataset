@@ -11,6 +11,14 @@ Both return ``torch.Tensor`` objects so the results integrate directly with
 PyTorch training loops.
 """
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+try:
+    __version__ = _pkg_version("artificial-dataset")
+except PackageNotFoundError:
+    __version__ = "unknown"
+
 from artificial_dataset._components import (
     compose,
     gaussian_noise,

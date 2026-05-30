@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68", "setuptools-scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 # --------------------------------------------------
@@ -8,7 +8,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "artificial-dataset"
-version = "0.0.1"
 description = "Artificial dataset generation from Gaussian noise, linear, polynomial, and sinusoidal components."
 readme = "README.md"
 license = "GPL-3.0"
@@ -36,7 +35,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence"
 ]
 
-dynamic = ["dependencies", "optional-dependencies"]
+dynamic = ["version", "dependencies", "optional-dependencies"]
 
 # --------------------------------------------------
 # URLs
@@ -47,6 +46,13 @@ dynamic = ["dependencies", "optional-dependencies"]
 Homepage = "https://github.com/dcintlab/image-processing"
 Repository = "https://github.com/dcintlab/image-processing"
 Issues = "https://github.com/dcintlab/image-processing/issues"
+
+# --------------------------------------------------
+# Dynamic versioning from git tags
+# --------------------------------------------------
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
