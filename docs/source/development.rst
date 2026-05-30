@@ -4,55 +4,98 @@ Development
 Setup
 -----
 
-Clone the repository and install the package with all development dependencies:
+Clone the repository over SSH and install the package with all development
+dependencies:
 
 .. code-block:: bash
 
-   git clone https://github.com/dcintlab/artificial-dataset.git
+   git clone git@github.com:dcintlab/artificial-dataset.git
    cd artificial-dataset
    pip install -e ".[dev]"
 
-Install the pre-commit hooks so linting runs automatically before each commit:
+Pre-commit hooks
+----------------
+
+The project uses `pre-commit <https://pre-commit.com>`_ to enforce code style
+and linting before every commit.  Install the hooks once after cloning:
 
 .. code-block:: bash
 
    pre-commit install
 
+From that point on, the hooks run automatically on the files staged for each
+commit.  To run them manually against every file in the repository (useful
+after changing hook configuration or when setting up a new environment):
+
+.. code-block:: bash
+
+   pre-commit run --all-files
+
 Running the tests
 -----------------
 
-.. code-block:: bash
-
-   pytest
-
-To also measure code coverage:
+The full test command mirrors what runs in CI:
 
 .. code-block:: bash
 
-   pytest --cov=artificial_dataset --cov-report=term-missing
+   pytest --cov=artificial_dataset \
+       --durations=0 \
+       --cov-report term \
+       --cov-report html:coverage-html \
+       --cov-report xml:coverage-report.xml \
+       --junitxml=junit-report.xml
+   coverage-badge -o coverage.svg
 
-Code style
-----------
+Explanation of the flags:
 
-The project uses `Black <https://black.readthedocs.io>`_ for formatting,
-`Ruff <https://docs.astral.sh/ruff>`_ for linting, and
-`mypy <https://mypy.readthedocs.io>`_ for static type checking.
-All three run automatically via pre-commit, but can also be invoked manually:
+``--cov=artificial_dataset``
+    Measure coverage for the ``artificial_dataset`` package only.
 
-.. code-block:: bash
+``--durations=0``
+    Print the runtime of every test at the end of the run, slowest first.
+    Useful for spotting unexpectedly slow tests.
 
-   black .
-   ruff check .
-   mypy artificial_dataset
+``--cov-report term``
+    Print a coverage summary to the terminal after the test run.
+
+``--cov-report html:coverage-html``
+    Write a browsable HTML coverage report to the ``coverage-html/`` directory.
+
+``--cov-report xml:coverage-report.xml``
+    Write a machine-readable XML coverage report, consumed by CI and coverage
+    tools such as Codecov.
+
+``--junitxml=junit-report.xml``
+    Write a JUnit-compatible XML test report, consumed by CI dashboards.
+
+``coverage-badge -o coverage.svg``
+    Generate an SVG badge from the coverage data produced by the preceding run.
 
 Building the documentation
 --------------------------
 
-Install the documentation dependencies and build with Sphinx:
+Install the documentation dependencies first:
 
 .. code-block:: bash
 
    pip install -e ".[docs]"
-   sphinx-build -b html docs/source docs/_build/html
 
-The rendered HTML is then available at ``docs/_build/html/index.html``.
+**Using Make** (recommended, run from the ``docs/`` directory):
+
+.. code-block:: bash
+
+   cd docs
+   make html
+
+The rendered HTML is written to ``docs/build/html/index.html``.
+Other targets (``make clean``, ``make linkcheck``, …) are available;
+run ``make help`` for the full list.
+
+**Using sphinx-build directly** (run from the project root):
+
+.. code-block:: bash
+
+   sphinx-build -W -T -b html docs/source docs/_build/html
+
+``-W`` promotes all warnings to errors so documentation issues are caught
+early; ``-T`` prints the full traceback on errors.
