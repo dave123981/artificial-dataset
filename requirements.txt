@@ -1,6 +1,6 @@
-torch>=2.4
-torchvision>=0.19
-numpy>=2.0
-scikit-learn>=1.5
-opencv-python>=4.10
-pre-commit>=3.7
+torch>=2.12
+torchvision>=0.27
+numpy>=2.4
+scikit-learn>=1.8
+opencv-python>=4.13
+pre-commit>=4.6
