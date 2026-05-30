@@ -20,9 +20,15 @@ copyright = "2026, Balázs Paszkál Halmos"
 author = "Balázs Paszkál Halmos"
 
 try:
-    release = _pkg_version("artificial-dataset")
-except PackageNotFoundError:
-    release = "unknown"
+    from setuptools_scm import get_version as _get_scm_version
+
+    release = _get_scm_version(root="../..", relative_to=__file__)
+except Exception:
+    try:
+        release = _pkg_version("artificial-dataset")
+    except PackageNotFoundError:
+        release = "0.0.0"
+
 version = release
 
 # -- General configuration ---------------------------------------------------
