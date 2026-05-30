@@ -1,6 +1,6 @@
 # artificial-dataset
 
-![coverage](.badges/coverage.svg)
+[![coverage](.badges/coverage.svg)](https://github.com/dcintlab/artificial-dataset/actions/workflows/tests.yml)
 
 Artificial dataset generation from Gaussian noise, linear, polynomial, and
 sinusoidal signal components.  The package provides two high-level PyTorch
