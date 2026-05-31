@@ -20,6 +20,14 @@ artificial\_dataset.classification module
    :show-inheritance:
    :undoc-members:
 
+artificial\_dataset.metrics module
+-----------------------------------
+
+.. automodule:: artificial_dataset.metrics
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Module contents
 ---------------
 
