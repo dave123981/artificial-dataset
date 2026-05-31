@@ -1,6 +1,12 @@
 # VS Code
 .vscode
 
+# vim
+.swp
+
+# Claude
+CLAUDE.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

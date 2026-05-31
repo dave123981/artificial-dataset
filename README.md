@@ -12,6 +12,9 @@ generators for classification and anomaly detection tasks.
   distinct combination of signal components.
 - **Anomaly detection** — normal vs. anomalous samples drawn from the same
   signal, with anomalies injected via amplified Gaussian noise.
+- **Classifier evaluation** — `ClassifierMetrics` computes accuracy,
+  macro-averaged precision, recall, F1, and a confusion matrix from full label
+  vectors or from anomaly index lists / tensors.
 - **Composable primitives** — `linear`, `polynomial`, `sinusoidal`, and
   `gaussian_noise` building blocks that can be freely combined via `compose`.
 - **PyTorch-native** — all generators return `torch.Tensor` objects that plug
@@ -83,6 +86,38 @@ class_params = [
 ]
 
 X, y = make_classification(n_samples=500, class_params=class_params, random_state=0)
+```
+
+### Evaluating a classifier
+
+`ClassifierMetrics` accepts full label vectors or, for the anomaly case, the
+index positions of the positive class.
+
+```python
+import torch
+from artificial_dataset import ClassifierMetrics, make_anomaly_dataset
+
+# --- from full label vectors ---
+X, y_true = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
+y_pred = y_true.clone()          # replace with your model's predictions
+y_pred[::10] = 1 - y_pred[::10] # flip every 10th label to simulate errors
+
+m = ClassifierMetrics(y_true, y_pred)
+print(m.accuracy)          # float
+print(m.precision)         # macro-averaged
+print(m.recall)            # macro-averaged
+print(m.f1_score)          # macro-averaged
+print(m.confusion_matrix)  # torch.Tensor of shape (n_classes, n_classes)
+
+# --- from anomaly index lists (no need to build the full y vector) ---
+true_anomaly_indices = (y_true == 1).nonzero(as_tuple=True)[0]
+pred_anomaly_indices = torch.tensor([12, 45, 100])  # model's detections
+
+m2 = ClassifierMetrics.from_anomaly_indices(
+    n_samples=500,
+    true_indices=true_anomaly_indices,
+    pred_indices=pred_anomaly_indices,
+)
 ```
 
 ### Low-level components

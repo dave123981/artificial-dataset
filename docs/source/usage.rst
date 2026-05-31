@@ -70,6 +70,51 @@ keys:
 
    X, y = make_classification(n_samples=500, class_params=class_params, random_state=0)
 
+Evaluating a classifier
+-----------------------
+
+:class:`~artificial_dataset.ClassifierMetrics` computes accuracy,
+macro-averaged precision, recall, F1 score, and a confusion matrix.  Two
+construction modes are available.
+
+**From full label vectors** — pass ``y_true`` and ``y_pred`` directly:
+
+.. code-block:: python
+
+   import torch
+   from artificial_dataset import ClassifierMetrics
+
+   y_true = torch.tensor([0, 1, 0, 1, 0, 1])
+   y_pred = torch.tensor([0, 1, 1, 1, 0, 0])
+
+   m = ClassifierMetrics(y_true, y_pred)
+   print(m.accuracy)          # fraction of correct predictions
+   print(m.precision)         # macro-averaged precision
+   print(m.recall)            # macro-averaged recall
+   print(m.f1_score)          # macro-averaged F1
+   print(m.confusion_matrix)  # torch.Tensor shape (n_classes, n_classes)
+
+**From anomaly index positions** — pass the index positions of the positive
+(anomaly) class instead of building the full label vectors manually:
+
+.. code-block:: python
+
+   import torch
+   from artificial_dataset import ClassifierMetrics, make_anomaly_dataset
+
+   X, y = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
+
+   true_indices = (y == 1).nonzero(as_tuple=True)[0]
+   pred_indices = torch.tensor([3, 27, 88, 142])  # your model's detections
+
+   m = ClassifierMetrics.from_anomaly_indices(
+       n_samples=500,
+       true_indices=true_indices,   # torch.Tensor or list[int]
+       pred_indices=pred_indices,
+   )
+   print(m.f1_score)
+   print(m.confusion_matrix)
+
 Low-level components
 --------------------
 
