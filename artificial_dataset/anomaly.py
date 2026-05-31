@@ -7,10 +7,12 @@ import torch
 
 from artificial_dataset._components import compose, gaussian_noise
 
-_DEFAULT_SIGNAL_PARAMS: dict[str, Any] = {
-    "sinusoidal": {"amplitude": 1.0, "frequency": 1.0, "phase": 0.0},
-    "linear": {"slope": 0.1, "intercept": 0.0},
-}
+_DEFAULT_CHANNEL_PARAMS: list[dict[str, Any]] = [
+    {
+        "sinusoidal": {"amplitude": 1.0, "frequency": 1.0, "phase": 0.0},
+        "linear": {"slope": 0.1, "intercept": 0.0},
+    }
+]
 
 
 def make_anomaly_dataset(
@@ -18,16 +20,17 @@ def make_anomaly_dataset(
     anomaly_fraction: float = 0.05,
     noise_std: float = 0.05,
     x_range: tuple[float, float] = (0.0, 2.0 * math.pi),
-    signal_params: dict[str, Any] | None = None,
+    channel_params: list[dict[str, Any]] | None = None,
     anomaly_scale: float = 6.0,
     random_state: int | None = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generate an anomaly detection dataset from signal components.
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Generate a multi-channel anomaly detection dataset from signal components.
 
     Normal samples follow a smooth signal built from a combination of
     linear, polynomial, and sinusoidal components with small Gaussian
     noise.  Anomalous samples are drawn from the same *x* distribution
-    but deviate from the clean signal by a large noise term.
+    but deviate from the clean signal by a large noise term on every
+    channel simultaneously.
 
     Parameters
     ----------
@@ -41,24 +44,28 @@ def make_anomaly_dataset(
     x_range : tuple[float, float], optional
         Closed interval ``[min, max]`` from which input values are drawn
         uniformly.
-    signal_params : dict[str, Any] | None, optional
-        Component configuration for the normal signal.  Passed directly to
-        :func:`~artificial_dataset._components.compose`.  When *None*,
-        a default sinusoidal + linear signal is used.
+    channel_params : list[dict[str, Any]] | None, optional
+        One signal-parameter dict per channel.  Each dict is passed
+        directly to :func:`~artificial_dataset._components.compose`.
+        When *None*, a single default sinusoidal + linear channel is
+        used.
     anomaly_scale : float, optional
         Multiplier applied to *noise_std* for anomalous samples, so an
         anomaly deviates from the clean signal by roughly
-        ``anomaly_scale * noise_std``.
+        ``anomaly_scale * noise_std`` on every channel.
     random_state : int | None, optional
         Seed passed to :func:`torch.manual_seed` for reproducibility.
 
     Returns
     -------
-    X : torch.Tensor, shape (n_samples, 2)
-        Feature matrix.  Column 0 contains the sampled *x* values; column 1
-        contains the observed signal value.
-    y : torch.Tensor, shape (n_samples,)
-        Labels: ``0`` for normal samples, ``1`` for anomalies,
+    x : torch.Tensor, shape (n_samples,)
+        Sampled input coordinates; intended for plotting only and not
+        required during classification.
+    y : torch.Tensor, shape (n_samples, n_channels)
+        Observed signal values.  Column *c* corresponds to
+        ``channel_params[c]``.
+    labels : torch.Tensor, shape (n_samples,)
+        Class labels: ``0`` for normal samples, ``1`` for anomalies,
         dtype ``torch.long``.
 
     Raises
@@ -68,10 +75,12 @@ def make_anomaly_dataset(
 
     Examples
     --------
-    >>> X, y = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
-    >>> X.shape, y.shape
-    (torch.Size([500, 2]), torch.Size([500]))
-    >>> int((y == 1).sum())
+    >>> x, y, labels = make_anomaly_dataset(
+    ...     n_samples=500, anomaly_fraction=0.1, random_state=0
+    ... )
+    >>> x.shape, y.shape, labels.shape
+    (torch.Size([500]), torch.Size([500, 1]), torch.Size([500]))
+    >>> int((labels == 1).sum())
     50
     """
     if not 0.0 < anomaly_fraction < 1.0:
@@ -80,27 +89,31 @@ def make_anomaly_dataset(
     if random_state is not None:
         torch.manual_seed(random_state)
 
-    if signal_params is None:
-        signal_params = _DEFAULT_SIGNAL_PARAMS
+    if channel_params is None:
+        channel_params = _DEFAULT_CHANNEL_PARAMS
 
     n_anomalies = round(n_samples * anomaly_fraction)
     n_normal = n_samples - n_anomalies
     x_min, x_max = x_range
 
     x_normal = torch.rand(n_normal) * (x_max - x_min) + x_min
-    signal_normal = compose(x_normal, signal_params) + gaussian_noise(
-        (n_normal,), mean=0.0, std=noise_std
-    )
-
     x_anomaly = torch.rand(n_anomalies) * (x_max - x_min) + x_min
-    signal_anomaly = compose(x_anomaly, signal_params) + gaussian_noise(
-        (n_anomalies,), mean=0.0, std=noise_std * anomaly_scale
-    )
 
-    features = torch.cat(
+    normal_channels = [
+        compose(x_normal, params) + gaussian_noise((n_normal,), mean=0.0, std=noise_std)
+        for params in channel_params
+    ]
+    anomaly_channels = [
+        compose(x_anomaly, params)
+        + gaussian_noise((n_anomalies,), mean=0.0, std=noise_std * anomaly_scale)
+        for params in channel_params
+    ]
+
+    x = torch.cat([x_normal, x_anomaly], dim=0)
+    y = torch.cat(
         [
-            torch.stack([x_normal, signal_normal], dim=1),
-            torch.stack([x_anomaly, signal_anomaly], dim=1),
+            torch.stack(normal_channels, dim=1),
+            torch.stack(anomaly_channels, dim=1),
         ],
         dim=0,
     )
@@ -111,4 +124,5 @@ def make_anomaly_dataset(
         ],
         dim=0,
     )
-    return features, labels
+    order = torch.argsort(x)
+    return x[order], y[order], labels[order]
