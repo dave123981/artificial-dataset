@@ -1,8 +1,10 @@
 Usage
 =====
 
-Both generators return ``(X, y)`` pairs of :class:`torch.Tensor` objects that
-plug directly into a PyTorch :class:`~torch.utils.data.DataLoader`.
+Both generators return :class:`torch.Tensor` objects that plug directly into a
+PyTorch :class:`~torch.utils.data.DataLoader`.  The anomaly generator returns
+a three-tuple ``(x, y, labels)``; the classification generator returns a
+two-tuple ``(X, y)``.
 
 Classification
 --------------
@@ -30,25 +32,54 @@ Anomaly detection
 samples (label ``0``) and anomalous samples (label ``1``).  Anomalies deviate
 from the clean signal by a large noise term controlled by ``anomaly_scale``.
 
+The function returns three tensors:
+
+* **x** — shape ``(n_samples,)``: sampled input coordinates, intended for
+  plotting only and not required during classification.
+* **y** — shape ``(n_samples, n_channels)``: observed signal values, one
+  column per channel.
+* **labels** — shape ``(n_samples,)``, dtype ``torch.long``: ``0`` for normal
+  samples, ``1`` for anomalies.
+
 .. code-block:: python
 
    from artificial_dataset import make_anomaly_dataset
 
-   X, y = make_anomaly_dataset(
+   x, y, labels = make_anomaly_dataset(
        n_samples=1000,
        anomaly_fraction=0.05,
        noise_std=0.05,
        anomaly_scale=6.0,
        random_state=42,
    )
-   # X: shape (1000, 2)  — column 0 is x, column 1 is the observed signal
-   # y: shape (1000,)    — 0 for normal, 1 for anomaly
+   # x:      shape (1000,)     — input coordinates for plotting
+   # y:      shape (1000, 1)   — observed signal (one channel by default)
+   # labels: shape (1000,)     — 0 for normal, 1 for anomaly
+
+Pass a list with more than one entry to ``channel_params`` to get multiple
+channels.  Anomalies are injected with the same scaled noise on every channel,
+so the label is consistent across the whole row:
+
+.. code-block:: python
+
+   channel_params = [
+       {"sinusoidal": {"amplitude": 1.0, "frequency": 1.0, "phase": 0.0}},
+       {"linear":     {"slope": 0.3, "intercept": 0.5}},
+   ]
+
+   x, y, labels = make_anomaly_dataset(
+       n_samples=600,
+       anomaly_fraction=0.08,
+       channel_params=channel_params,
+       random_state=0,
+   )
+   # y: shape (600, 2)  — two independent signal channels
 
 Custom signal shapes
 --------------------
 
-Both generators accept a ``class_params`` / ``signal_params`` argument that
-controls which signal components are superimposed.  The ``params`` dict may
+Both generators accept a ``class_params`` / ``channel_params`` argument that
+controls which signal components are superimposed.  Each params dict may
 contain any combination of ``"linear"``, ``"polynomial"``, and ``"sinusoidal"``
 keys:
 
@@ -102,9 +133,9 @@ construction modes are available.
    import torch
    from artificial_dataset import ClassifierMetrics, make_anomaly_dataset
 
-   X, y = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
+   x, y, labels = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
 
-   true_indices = (y == 1).nonzero(as_tuple=True)[0]
+   true_indices = (labels == 1).nonzero(as_tuple=True)[0]
    pred_indices = torch.tensor([3, 27, 88, 142])  # your model's detections
 
    m = ClassifierMetrics.from_anomaly_indices(
