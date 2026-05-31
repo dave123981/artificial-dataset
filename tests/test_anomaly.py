@@ -65,6 +65,12 @@ def test_x_values_within_range() -> None:
     assert float(x.max()) <= hi
 
 
+def test_x_is_sorted() -> None:
+    """Returned x values are in non-decreasing order."""
+    x, _, _ = make_anomaly_dataset(n_samples=200, random_state=7)
+    assert torch.all(x[1:] >= x[:-1])
+
+
 def test_reproducibility() -> None:
     """Same random seed produces identical outputs."""
     x1, y1, labels1 = make_anomaly_dataset(n_samples=100, random_state=42)

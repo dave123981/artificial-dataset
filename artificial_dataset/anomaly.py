@@ -124,4 +124,5 @@ def make_anomaly_dataset(
         ],
         dim=0,
     )
-    return x, y, labels
+    order = torch.argsort(x)
+    return x[order], y[order], labels[order]
