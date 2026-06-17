@@ -112,7 +112,7 @@ class ClassifierMetrics:
         ...     pred_indices=torch.tensor([1, 2]),
         ... )
         >>> round(m.accuracy, 2)
-        0.8
+        0.6
         """
         if n_samples <= 0:
             raise ValueError(f"n_samples must be positive, got {n_samples}")
