@@ -26,12 +26,20 @@ from artificial_dataset._components import (
     polynomial,
     sinusoidal,
 )
-from artificial_dataset.anomaly import make_anomaly_dataset
+from artificial_dataset.anomaly import (
+    AnomalyDataset,
+    AnomalySplits,
+    SpikeParams,
+    make_anomaly_dataset,
+)
 from artificial_dataset.classification import make_classification
 from artificial_dataset.metrics import ClassifierMetrics
 
 __all__ = [
+    "AnomalyDataset",
+    "AnomalySplits",
     "ClassifierMetrics",
+    "SpikeParams",
     "compose",
     "gaussian_noise",
     "linear",
