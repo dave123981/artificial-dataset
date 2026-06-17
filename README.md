@@ -53,20 +53,24 @@ X, y = make_classification(
 ```python
 from artificial_dataset import make_anomaly_dataset
 
-X, y = make_anomaly_dataset(
-    n_samples=1000,
-    anomaly_fraction=0.05,
-    noise_std=0.05,
-    anomaly_scale=6.0,
+data = make_anomaly_dataset(
+    series_length=1000,
+    noise_std=0.4,
     random_state=42,
 )
-# X: torch.Tensor of shape (1000, 2)  — column 0: x values, column 1: observed signal
-# y: torch.Tensor of shape (1000,)    — 0 for normal, 1 for anomaly
+# data.y:            torch.Tensor of shape (m, T)  — m channels, length T
+# data.labels:       torch.Tensor of shape (T,)    — 0 normal, 1 anomalous timestep
+# data.t:            torch.Tensor of shape (T,)    — time grid
+# data.peak_indices: LongTensor of spike-event centres
+
+# Split along the time axis into train / val / test segments:
+splits = make_anomaly_dataset(series_length=1000, split=(0.7, 0.15, 0.15))
+# splits.train.y, splits.val.y, splits.test.y  — (m, 700), (m, 150), (m, 150)
 ```
 
 ### Custom signal shapes
 
-Both generators accept a `class_params` / `signal_params` argument that
+Both generators accept a `class_params` / `channel_params` argument that
 controls which components are superimposed.  Each entry is a dict with any
 combination of `"linear"`, `"polynomial"`, and `"sinusoidal"` keys:
 
@@ -98,7 +102,8 @@ import torch
 from artificial_dataset import ClassifierMetrics, make_anomaly_dataset
 
 # --- from full label vectors ---
-X, y_true = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
+data = make_anomaly_dataset(series_length=500, random_state=0)
+y_true = data.labels             # per-timestep mask, shape (T,)
 y_pred = y_true.clone()          # replace with your model's predictions
 y_pred[::10] = 1 - y_pred[::10] # flip every 10th label to simulate errors
 
@@ -114,7 +119,7 @@ true_anomaly_indices = (y_true == 1).nonzero(as_tuple=True)[0]
 pred_anomaly_indices = torch.tensor([12, 45, 100])  # model's detections
 
 m2 = ClassifierMetrics.from_anomaly_indices(
-    n_samples=500,
+    n_samples=data.y.shape[1],
     true_indices=true_anomaly_indices,
     pred_indices=pred_anomaly_indices,
 )

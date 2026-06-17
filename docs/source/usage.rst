@@ -1,10 +1,12 @@
 Usage
 =====
 
-Both generators return :class:`torch.Tensor` objects that plug directly into a
-PyTorch :class:`~torch.utils.data.DataLoader`.  The anomaly generator returns
-a three-tuple ``(x, y, labels)``; the classification generator returns a
-two-tuple ``(X, y)``.
+Both generators produce :class:`torch.Tensor` data that plugs directly into a
+PyTorch :class:`~torch.utils.data.DataLoader`.  The classification generator
+returns a two-tuple ``(X, y)``; the anomaly generator returns an
+:class:`~artificial_dataset.AnomalyDataset` dataclass whose main field ``y``
+has shape ``(m, T)`` — a single multivariate time series of ``m`` channels,
+each of length ``T``.
 
 Classification
 --------------
@@ -28,37 +30,39 @@ dataset.  Each class follows a distinct combination of signal components.
 Anomaly detection
 -----------------
 
-:func:`~artificial_dataset.make_anomaly_dataset` produces a dataset of normal
-samples (label ``0``) and anomalous samples (label ``1``).  Anomalies deviate
-from the clean signal by a large noise term controlled by ``anomaly_scale``.
+:func:`~artificial_dataset.make_anomaly_dataset` produces a single multivariate
+time series.  Every channel shares a smooth baseline (a superposition of signal
+components) plus Gaussian measurement noise, and a configurable number of
+**positive triangular spikes** are added on top.  Anomalies are therefore always
+peaks that rise above the baseline, never one-off off-points.
 
-The function returns three tensors:
+The function returns an :class:`~artificial_dataset.AnomalyDataset` with:
 
-* **x** — shape ``(n_samples,)``: sampled input coordinates, intended for
-  plotting only and not required during classification.
-* **y** — shape ``(n_samples, n_channels)``: observed signal values, one
-  column per channel.
-* **labels** — shape ``(n_samples,)``, dtype ``torch.long``: ``0`` for normal
-  samples, ``1`` for anomalies.
+* **y** — shape ``(m, T)``, dtype ``torch.float32``: the main data tensor of
+  ``m`` channels, each of length ``T``.
+* **labels** — shape ``(T,)``, dtype ``torch.long``: per-timestep anomaly mask,
+  ``1`` inside the support of a spike and ``0`` elsewhere.
+* **t** — shape ``(T,)``: the time grid the baselines are evaluated on.
+* **peak_indices** — a sorted ``LongTensor`` of the ground-truth spike-event
+  centres as sample positions into the series.
 
 .. code-block:: python
 
    from artificial_dataset import make_anomaly_dataset
 
-   x, y, labels = make_anomaly_dataset(
-       n_samples=1000,
-       anomaly_fraction=0.05,
-       noise_std=0.05,
-       anomaly_scale=6.0,
+   data = make_anomaly_dataset(
+       series_length=1000,
+       noise_std=0.4,
        random_state=42,
    )
-   # x:      shape (1000,)     — input coordinates for plotting
-   # y:      shape (1000, 1)   — observed signal (one channel by default)
-   # labels: shape (1000,)     — 0 for normal, 1 for anomaly
+   data.y.shape         # torch.Size([1, 1000]) — (m, T)
+   data.labels.shape    # torch.Size([1000])    — 0 normal, 1 anomalous timestep
+   data.t.shape         # torch.Size([1000])    — time grid
+   data.peak_indices    # LongTensor of spike-event centres
 
 Pass a list with more than one entry to ``channel_params`` to get multiple
-channels.  Anomalies are injected with the same scaled noise on every channel,
-so the label is consistent across the whole row:
+channels.  Each spike event shares its centre and width across all channels,
+while every channel responds with its own random amplitude:
 
 .. code-block:: python
 
@@ -67,13 +71,62 @@ so the label is consistent across the whole row:
        {"linear":     {"slope": 0.3, "intercept": 0.5}},
    ]
 
-   x, y, labels = make_anomaly_dataset(
-       n_samples=600,
-       anomaly_fraction=0.08,
+   data = make_anomaly_dataset(
+       series_length=600,
        channel_params=channel_params,
        random_state=0,
    )
-   # y: shape (600, 2)  — two independent signal channels
+   # data.y: shape (2, 600)  — two channels
+
+Configuring the spikes
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The spikes are random but fully configurable through the
+:class:`~artificial_dataset.SpikeParams` dataclass.  Every property is drawn
+uniformly from an inclusive range:
+
+.. code-block:: python
+
+   from artificial_dataset import SpikeParams, make_anomaly_dataset
+
+   spikes = SpikeParams(
+       amplitude_range=(4.0, 7.0),  # peak height, sampled per channel
+       width_range=(3, 6),          # triangular half-width in samples
+       count_range=(3, 8),          # number of spike events in the series
+       margin=20,                   # keep spikes this far from either end
+   )
+
+   data = make_anomaly_dataset(
+       series_length=1000,
+       spike_params=spikes,
+       random_state=0,
+   )
+
+Train / validation / test splitting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass ``split=(train, val, test)`` to receive an
+:class:`~artificial_dataset.AnomalySplits` instead of a single dataset.  The
+timeline is cut contiguously from the beginning: the first fraction of the ``T``
+timesteps becomes ``train``, the next ``val``, and the remainder ``test``.  Each
+segment's ``peak_indices`` are filtered to the spikes it contains and re-based to
+local sample positions.  The same partition is available as
+:meth:`~artificial_dataset.AnomalyDataset.split` on an existing dataset:
+
+.. code-block:: python
+
+   splits = make_anomaly_dataset(
+       series_length=1000,
+       split=(0.7, 0.15, 0.15),
+       random_state=6,
+   )
+   splits.train.y.shape   # torch.Size([1, 700])
+   splits.val.y.shape     # torch.Size([1, 150])
+   splits.test.y.shape    # torch.Size([1, 150])
+
+   # Equivalently, split an existing dataset after the fact:
+   data = make_anomaly_dataset(series_length=1000, random_state=6)
+   splits = data.split((0.7, 0.15, 0.15))
 
 Custom signal shapes
 --------------------
@@ -133,13 +186,15 @@ construction modes are available.
    import torch
    from artificial_dataset import ClassifierMetrics, make_anomaly_dataset
 
-   x, y, labels = make_anomaly_dataset(n_samples=500, anomaly_fraction=0.1, random_state=0)
+   data = make_anomaly_dataset(series_length=1000, random_state=0)
 
-   true_indices = (labels == 1).nonzero(as_tuple=True)[0]
-   pred_indices = torch.tensor([3, 27, 88, 142])  # your model's detections
+   # Detector flagging timesteps whose value crosses a threshold.
+   timestep_max = data.y.amax(dim=0)
+   pred_indices = (timestep_max > 2.0).nonzero(as_tuple=True)[0]
+   true_indices = (data.labels == 1).nonzero(as_tuple=True)[0]
 
    m = ClassifierMetrics.from_anomaly_indices(
-       n_samples=500,
+       n_samples=data.y.shape[1],
        true_indices=true_indices,   # torch.Tensor or list[int]
        pred_indices=pred_indices,
    )
