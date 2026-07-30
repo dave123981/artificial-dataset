@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Union
-import matplotlib.pyplot as plt
+from typing import Any, Dict, List, Optional, Union
 import torch
 import torch.nn.functional as F
 
