@@ -2,9 +2,7 @@ import pytest
 import torch
 
 from artificial_dataset.injectors import (
-    SpikeInjectionParams,
     add_collective_anomaly,
-    add_contextual_anomalies,
     add_dropout,
     add_level_shift,
     add_point_anomalies,
@@ -12,8 +10,7 @@ from artificial_dataset.injectors import (
     add_spike_anomalies,
     add_trend_change,
     add_variance_change,
-    anomaly_summary,
-    get_anomaly_segments,
+    anomaly_summary
 )
 from artificial_dataset.series import SyntheticSeries, make_series
 
