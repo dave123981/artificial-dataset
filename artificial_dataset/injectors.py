@@ -159,54 +159,6 @@ def add_spike_anomalies(
     return series
 
 
-def add_contextual_anomalies(
-    series: SyntheticSeries,
-    n_anomalies: int = 5,
-    local_window: int = 10,
-    magnitude: Union[float, tuple[float, float]] = (2.5, 4.0),
-    avoid_existing: bool = True,
-    random_state: Optional[int] = None,
-) -> SyntheticSeries:
-    """Inject point anomalies breaking local window patterns."""
-    series = _copy_series(series)
-    N = len(series)
-
-    gen = torch.Generator()
-    if random_state is not None:
-        gen.manual_seed(random_state)
-
-    idx = _resolve_indices(n_anomalies, N, series.is_anomaly, avoid_existing, gen)
-    mags = []
-
-    for i in idx:
-        item_i = i.item()
-        lo, hi = max(0, item_i - local_window), min(N, item_i + local_window + 1)
-        
-        # Window excluding current index
-        mask = torch.ones(hi - lo, dtype=torch.bool)
-        mask[item_i - lo] = False
-        window = series.y[lo:hi][mask]
-
-        local_std = torch.std(window).item() or 1e-6
-        local_mean = torch.mean(window).item()
-
-        prev_val = series.y[max(item_i - 1, 0)].item()
-        next_val = series.y[min(item_i + 1, N - 1)].item()
-        direction = -1.0 if (next_val - prev_val) >= 0 else 1.0
-
-        if isinstance(magnitude, tuple):
-            m = magnitude[0] + (magnitude[1] - magnitude[0]) * torch.rand(1, generator=gen).item()
-        else:
-            m = magnitude
-        mags.append(m)
-
-        series.y[item_i] = local_mean + direction * m * local_std
-
-    _mark(series, idx, "contextual")
-    _log(series, {"type": "contextual", "indices": idx.tolist(), "magnitude_local_std": mags})
-    return series
-
-
 def add_collective_anomaly(
     series: SyntheticSeries,
     start_idx: int,
@@ -381,7 +333,6 @@ def add_seasonal_distortion(
     _mark(series, idx, "seasonal_distortion")
     _log(series, {"type": "seasonal_distortion", "start_idx": start_idx, "end_idx": end_idx, "mode": mode, "factor": factor})
     return series
-
 
 # ---------- o ----------
 # Summary
