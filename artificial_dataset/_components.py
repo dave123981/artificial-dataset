@@ -273,3 +273,53 @@ def compose(x: torch.Tensor, params: dict[str, Any]) -> torch.Tensor:
     if "sinusoidal" in params:
         signal = signal + sinusoidal(x, **params["sinusoidal"])
     return signal
+
+
+def compose_weighted(x: torch.Tensor, components: list[dict[str, Any]]) -> torch.Tensor:
+    """Evaluate a weighted sum of several composed signals at *x*.
+
+    Unlike :func:`compose`, which sums at most one instance of each
+    component type (dict keys must be unique), *compose_weighted* accepts a
+    list, so the same component type can appear more than once — e.g. two
+    sinusoids at different frequencies — each contributing with its own
+    weight.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Input values, shape ``(n,)``.
+    components : list[dict[str, Any]]
+        One entry per term in the sum. Each entry is a ``params`` dict as
+        understood by :func:`compose` (e.g. ``{"sinusoidal": {...}}``), plus
+        an optional ``"weight"`` key (default ``1.0``) scaling that term.
+
+    Returns
+    -------
+    torch.Tensor
+        Superposed signal of the same shape as *x*.
+
+    Raises
+    ------
+    ValueError
+        If *components* is empty.
+
+    Examples
+    --------
+    >>> import torch
+    >>> x = torch.linspace(0, 10, steps=50)
+    >>> y = compose_weighted(x, [
+    ...     {"linear": {"slope": 0.2}},
+    ...     {"sinusoidal": {"amplitude": 1.0, "frequency": 0.5}, "weight": 0.5},
+    ... ])
+    >>> y.shape
+    torch.Size([50])
+    """
+    if not components:
+        raise ValueError("components must contain at least one entry.")
+
+    total = torch.zeros_like(x)
+    for entry in components:
+        weight = entry.get("weight", 1.0)
+        params = {key: value for key, value in entry.items() if key != "weight"}
+        total = total + weight * compose(x, params)
+    return total
