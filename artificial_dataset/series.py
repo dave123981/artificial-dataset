@@ -44,6 +44,10 @@ class SyntheticSeries:
     def __len__(self) -> int:
         return len(self.x)
 
+    def pipe(self, func, *args, **kwargs):
+        """Pass self to `func(self, *args, **kwargs)` and return the result."""
+        return func(self, *args, **kwargs)
+
 
 def _generate_timeline(length: int) -> torch.tensor:
     """Return the x axis: 0, 1, 2, ..., length - 1 (a.u., step size 1)."""
