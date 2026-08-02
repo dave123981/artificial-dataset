@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from artificial_dataset.injectors import (
+    SpikeParams,
     add_collective_anomaly,
     add_dropout,
     add_level_shift,
@@ -56,6 +57,18 @@ def test_add_collective_anomaly_patterns(base_series: SyntheticSeries, pattern: 
     expected_indices = torch.arange(start_idx, start_idx + length)
     assert torch.all(modified.is_anomaly[expected_indices])
     assert all("collective" in modified.anomaly_type[i] for i in expected_indices.tolist())
+
+
+def test_add_spike_anomalies(base_series: SyntheticSeries):
+    """Verify triangular spike anomalies injection using injectors.SpikeParams."""
+    params = SpikeParams(amplitude_range=(3.0, 5.0), width_range=(2, 4), margin=10)
+    modified = add_spike_anomalies(base_series, n_anomalies=2, spike_params=params, random_state=42)
+
+    assert modified.is_anomaly.sum().item() > 0
+    assert any("spike" in t for t in modified.anomaly_type)
+    assert len(modified.anomalies) == 1
+    assert modified.anomalies[0]["type"] == "spike"
+    assert len(modified.anomalies[0]["indices"]) == 2
 
 
 def test_add_level_shift(base_series: SyntheticSeries):
