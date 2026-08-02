@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from artificial_dataset.series import SyntheticSeries, make_series
+from artificial_dataset.series import SyntheticSeries, make_series, make_composite_series
 
 
 def test_synthetic_series_dataclass_initialization():
@@ -83,9 +83,8 @@ def test_make_series_composite():
         {"function_type": "sinusoidal", "function_params": {"frequency": 0.05}, "weight": 0.5},
     ]
 
-    series = make_series(
+    series = make_composite_series(
         series_length=200,
-        function_type="composite",
         components=components,
         noise_std=0.0,
     )
