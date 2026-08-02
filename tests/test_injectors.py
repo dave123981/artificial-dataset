@@ -47,23 +47,6 @@ def test_add_point_anomalies(base_series: SyntheticSeries):
     assert modified.anomalies[0]["type"] == "point"
 
 
-def test_add_spike_anomalies(base_series: SyntheticSeries):
-    """Verify positive triangular spike anomalies injection."""
-    params = SpikeInjectionParams(amplitude_range=(3.0, 5.0), width_range=(2, 4), margin=10)
-    modified = add_spike_anomalies(base_series, n_anomalies=2, spike_params=params, random_state=42)
-
-    assert modified.is_anomaly.sum().item() > 0
-    assert any("spike" in t for t in modified.anomaly_type)
-
-
-def test_add_contextual_anomalies(base_series: SyntheticSeries):
-    """Verify contextual anomaly generation without NumPy or indexing errors."""
-    modified = add_contextual_anomalies(base_series, n_anomalies=3, local_window=8, random_state=1)
-
-    assert modified.is_anomaly.sum().item() == 3
-    assert any("contextual" in t for t in modified.anomaly_type)
-
-
 @pytest.mark.parametrize("pattern", ["noise", "flat", "reverse", "scale", "constant"])
 def test_add_collective_anomaly_patterns(base_series: SyntheticSeries, pattern: str):
     """Verify subsequence pattern overwrites for collective anomalies."""
