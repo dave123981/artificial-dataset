@@ -113,20 +113,21 @@ def test_injector_stacking_and_overlapping(base_series: SyntheticSeries):
     assert isinstance(overlapped_tags, list)
 
 
-def test_anomaly_summary_and_get_segments(base_series: SyntheticSeries):
-    """Verify extraction of audit trail logs and evaluation segment boundaries."""
+def test_anomaly_summary(base_series: SyntheticSeries):
+    """Verify extraction of the audit trail log for stacked injectors."""
     series = add_collective_anomaly(base_series, start_idx=10, length=15, pattern="flat")
     series = add_collective_anomaly(series, start_idx=50, length=20, pattern="noise")
 
     summary = anomaly_summary(series)
-    segments = get_anomaly_segments(series)
 
     assert len(summary) == 2
-    assert len(segments) == 2
-    assert segments[0]["start_idx"] == 10
-    assert segments[0]["end_idx"] == 25
-    assert segments[0]["duration"] == 15
-    assert "collective" in segments[0]["types"]
+    assert summary[0]["type"] == "collective"
+    assert summary[0]["start_idx"] == 10
+    assert summary[0]["end_idx"] == 25
+    assert summary[0]["pattern"] == "flat"
+    assert summary[1]["start_idx"] == 50
+    assert summary[1]["end_idx"] == 70
+    assert summary[1]["pattern"] == "noise"
 
 
 def test_zero_std_nan_regression_protection():
