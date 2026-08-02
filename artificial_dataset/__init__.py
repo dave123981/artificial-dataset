@@ -64,7 +64,6 @@ __all__ = [
     "SpikeParams",
     "SyntheticSeries",
     "add_collective_anomaly",
-    "add_contextual_anomalies",
     "add_dropout",
     "add_level_shift",
     "add_point_anomalies",
