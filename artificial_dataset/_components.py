@@ -168,12 +168,15 @@ def periodic_seasonal(
     elif waveform == "square":
         values = torch.sign(torch.sin(2 * torch.pi * phase_fraction))
     elif waveform == "triangle":
-        values = 2 * torch.abs(2 * (phase_fraction - torch.floor(phase_fraction + 0.5))) - 1
+        values = (
+            2 * torch.abs(2 * (phase_fraction - torch.floor(phase_fraction + 0.5))) - 1
+        )
     elif waveform == "sawtooth":
         values = 2 * phase_fraction - 1
     else:
         raise ValueError(
-            f"Unknown waveform '{waveform}'. Choose from: sine, square, triangle, sawtooth."
+            f"Unknown waveform '{waveform}'. Choose from: sine, square, triangle, \
+                sawtooth."
         )
 
     return amplitude * values + offset
@@ -238,7 +241,8 @@ def compose(x: torch.Tensor, params: dict[str, Any]) -> torch.Tensor:
     * ``"linear"``            - ``dict`` of keyword arguments for :func:`linear`
     * ``"exponential"``       - ``dict`` of keyword arguments for :func:`exponential`
     * ``"logarithmic"``       - ``dict`` of keyword arguments for :func:`logarithmic`
-    * ``"periodic_seasonal"`` - ``dict`` of keyword arguments for :func:`periodic_seasonal`
+    * ``"periodic_seasonal"`` - ``dict`` of keyword arguments for :func:
+                                                                  `periodic_seasonal`
     * ``"polynomial"``        - ``dict`` of keyword arguments for :func:`polynomial`
     * ``"sinusoidal"``        - ``dict`` of keyword arguments for :func:`sinusoidal`
 

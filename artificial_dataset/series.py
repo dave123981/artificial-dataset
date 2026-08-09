@@ -1,17 +1,19 @@
-"""
-series.py
+"""Synthetic time series dataset generation.
 
-Defines the SyntheticSeries dataclass and entry-point functions for 
+Defines the SyntheticSeries dataclass and entry-point functions for
 generating synthetic 1D time series datasets.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import torch
 
 from artificial_dataset._components import compose, compose_weighted, gaussian_noise
+
 
 @dataclass
 class SyntheticSeries:
@@ -34,17 +36,19 @@ class SyntheticSeries:
     meta : dict[str, Any]
         Generation metadata (e.g., function_type, parameters, noise_std).
     """
+
     x: torch.Tensor
     y: torch.Tensor
     is_anomaly: torch.Tensor
-    anomaly_type: List[str]
-    anomalies: List[Dict[str, Any]] = field(default_factory=list)
-    meta: Dict[str, Any] = field(default_factory=dict)
+    anomaly_type: list[str]
+    anomalies: list[dict[str, Any]] = field(default_factory=list)
+    meta: dict[str, Any] = field(default_factory=dict)
 
     def __len__(self) -> int:
+        """Return the number of samples in the series."""
         return len(self.x)
 
-    def pipe(self, func, *args, **kwargs):
+    def pipe(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Pass self to `func(self, *args, **kwargs)` and return the result."""
         return func(self, *args, **kwargs)
 
@@ -59,9 +63,9 @@ def _generate_timeline(length: int) -> torch.tensor:
 def make_series(
     series_length: int,
     function_type: str,
-    function_params: Optional[Dict[str, Any]] = None,
+    function_params: dict[str, Any] | None = None,
     noise_std: float = 0.0,
-    random_state: Optional[int] = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """
     Generate a synthetic 1D time series using a single base function.
@@ -113,9 +117,9 @@ def make_series(
 
 def make_composite_series(
     series_length: int,
-    components: List[Dict[str, Any]],
+    components: list[dict[str, Any]],
     noise_std: float = 0.0,
-    random_state: Optional[int] = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """
     Generate a synthetic 1D time series by summing multiple weighted base functions.

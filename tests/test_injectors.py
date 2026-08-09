@@ -1,3 +1,5 @@
+"""Unit tests for the anomaly injection functions."""
+
 import pytest
 import torch
 
@@ -11,7 +13,7 @@ from artificial_dataset.injectors import (
     add_spike_anomalies,
     add_trend_change,
     add_variance_change,
-    anomaly_summary
+    anomaly_summary,
 )
 from artificial_dataset.series import SyntheticSeries, make_series
 
@@ -28,8 +30,8 @@ def base_series() -> SyntheticSeries:
     )
 
 
-def test_injector_immutability(base_series: SyntheticSeries):
-    """Verify injectors return a new SyntheticSeries object without mutating the original input."""
+def test_injector_immutability(base_series: SyntheticSeries) -> None:
+    """Verify injectors returns a new SyntheticSeries without mutating original."""
     original_y = base_series.y.clone()
     modified = add_point_anomalies(base_series, n_anomalies=3, random_state=1)
 
@@ -39,7 +41,7 @@ def test_injector_immutability(base_series: SyntheticSeries):
     assert modified.is_anomaly.sum().item() > 0
 
 
-def test_add_point_anomalies(base_series: SyntheticSeries):
+def test_add_point_anomalies(base_series: SyntheticSeries) -> None:
     """Verify point anomaly spikes and mask labeling."""
     modified = add_point_anomalies(base_series, n_anomalies=4, random_state=123)
 
@@ -49,20 +51,28 @@ def test_add_point_anomalies(base_series: SyntheticSeries):
 
 
 @pytest.mark.parametrize("pattern", ["noise", "flat", "reverse", "scale", "constant"])
-def test_add_collective_anomaly_patterns(base_series: SyntheticSeries, pattern: str):
+def test_add_collective_anomaly_patterns(
+    base_series: SyntheticSeries, pattern: str
+) -> None:
     """Verify subsequence pattern overwrites for collective anomalies."""
     start_idx, length = 30, 15
-    modified = add_collective_anomaly(base_series, start_idx=start_idx, length=length, pattern=pattern)
+    modified = add_collective_anomaly(
+        base_series, start_idx=start_idx, length=length, pattern=pattern
+    )
 
     expected_indices = torch.arange(start_idx, start_idx + length)
     assert torch.all(modified.is_anomaly[expected_indices])
-    assert all("collective" in modified.anomaly_type[i] for i in expected_indices.tolist())
+    assert all(
+        "collective" in modified.anomaly_type[i] for i in expected_indices.tolist()
+    )
 
 
-def test_add_spike_anomalies(base_series: SyntheticSeries):
+def test_add_spike_anomalies(base_series: SyntheticSeries) -> None:
     """Verify triangular spike anomalies injection using injectors.SpikeParams."""
     params = SpikeParams(amplitude_range=(3.0, 5.0), width_range=(2, 4), margin=10)
-    modified = add_spike_anomalies(base_series, n_anomalies=2, spike_params=params, random_state=42)
+    modified = add_spike_anomalies(
+        base_series, n_anomalies=2, spike_params=params, random_state=42
+    )
 
     assert modified.is_anomaly.sum().item() > 0
     assert any("spike" in t for t in modified.anomaly_type)
@@ -71,7 +81,7 @@ def test_add_spike_anomalies(base_series: SyntheticSeries):
     assert len(modified.anomalies[0]["indices"]) == 2
 
 
-def test_add_level_shift(base_series: SyntheticSeries):
+def test_add_level_shift(base_series: SyntheticSeries) -> None:
     """Verify sudden level mean shift."""
     modified = add_level_shift(base_series, start_idx=50, duration=30, random_state=1)
 
@@ -79,7 +89,7 @@ def test_add_level_shift(base_series: SyntheticSeries):
     assert not modified.is_anomaly[0:50].any()
 
 
-def test_add_trend_change(base_series: SyntheticSeries):
+def test_add_trend_change(base_series: SyntheticSeries) -> None:
     """Verify slope break ramp injection."""
     modified = add_trend_change(base_series, start_idx=40, new_slope=0.1, duration=20)
 
@@ -87,15 +97,17 @@ def test_add_trend_change(base_series: SyntheticSeries):
     assert any("trend_change" in tag for tag in modified.anomaly_type)
 
 
-def test_add_variance_change(base_series: SyntheticSeries):
+def test_add_variance_change(base_series: SyntheticSeries) -> None:
     """Verify local variance noise burst injection."""
-    modified = add_variance_change(base_series, start_idx=20, duration=25, scale_factor=5.0, random_state=7)
+    modified = add_variance_change(
+        base_series, start_idx=20, duration=25, scale_factor=5.0, random_state=7
+    )
 
     assert torch.all(modified.is_anomaly[20:45])
 
 
 @pytest.mark.parametrize("mode", ["flatline", "zero", "nan"])
-def test_add_dropout_modes(base_series: SyntheticSeries, mode: str):
+def test_add_dropout_modes(base_series: SyntheticSeries, mode: str) -> None:
     """Verify sensor dropout modes including flatline, zero, and NaN."""
     modified = add_dropout(base_series, start_idx=10, duration=10, mode=mode)
 
@@ -107,28 +119,32 @@ def test_add_dropout_modes(base_series: SyntheticSeries, mode: str):
 
 
 @pytest.mark.parametrize("mode", ["stretch", "compress", "damp", "phase_shift"])
-def test_add_seasonal_distortion(base_series: SyntheticSeries, mode: str):
+def test_add_seasonal_distortion(base_series: SyntheticSeries, mode: str) -> None:
     """Verify seasonal periodic distortion patterns."""
-    modified = add_seasonal_distortion(base_series, start_idx=30, duration=20, mode=mode, factor=2.0)
+    modified = add_seasonal_distortion(
+        base_series, start_idx=30, duration=20, mode=mode, factor=2.0
+    )
 
     assert torch.all(modified.is_anomaly[30:50])
 
 
-def test_injector_stacking_and_overlapping(base_series: SyntheticSeries):
-    """Verify sequential stacking of multiple injectors and overlapping anomaly tag merging."""
+def test_injector_stacking_and_overlapping(base_series: SyntheticSeries) -> None:
+    """Verify sequential stacking of injectors and overlapping anomaly merging."""
     series = add_level_shift(base_series, start_idx=20, duration=40, random_state=1)
     series = add_point_anomalies(series, n_anomalies=5, random_state=2)
 
     assert len(series.anomalies) == 2
-    
+
     # Verify overlapping tag merging "|"-separated string
     overlapped_tags = [t for t in series.anomaly_type if "|" in t]
     assert isinstance(overlapped_tags, list)
 
 
-def test_anomaly_summary(base_series: SyntheticSeries):
+def test_anomaly_summary(base_series: SyntheticSeries) -> None:
     """Verify extraction of the audit trail log for stacked injectors."""
-    series = add_collective_anomaly(base_series, start_idx=10, length=15, pattern="flat")
+    series = add_collective_anomaly(
+        base_series, start_idx=10, length=15, pattern="flat"
+    )
     series = add_collective_anomaly(series, start_idx=50, length=20, pattern="noise")
 
     summary = anomaly_summary(series)
@@ -143,10 +159,12 @@ def test_anomaly_summary(base_series: SyntheticSeries):
     assert summary[1]["pattern"] == "noise"
 
 
-def test_zero_std_nan_regression_protection():
+def test_zero_std_nan_regression_protection() -> None:
     """Verify safe standard deviation fallback when input series is flat (std = 0)."""
-    flat_series = make_series(series_length=50, function_type="constant", function_params={"value": 1.0})
-    
+    flat_series = make_series(
+        series_length=50, function_type="constant", function_params={"value": 1.0}
+    )
+
     # Should execute safely without producing NaN values or division by zero errors
     modified = add_point_anomalies(flat_series, n_anomalies=2, random_state=42)
     assert not torch.isnan(modified.y).any()

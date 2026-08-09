@@ -1,17 +1,25 @@
+"""Unit tests for the 1D dataset generation and SyneticSeries dataclass."""
+
+from typing import Any
+
 import pytest
 import torch
 
-from artificial_dataset.series import SyntheticSeries, make_series, make_composite_series
+from artificial_dataset.series import (
+    SyntheticSeries,
+    make_composite_series,
+    make_series,
+)
 
 
-def test_synthetic_series_dataclass_initialization():
+def test_synthetic_series_dataclass_initialization() -> None:
     """Verify SyntheticSeries dataclass instantiation and default field structures."""
     series_length = 50
     x = torch.arange(series_length, dtype=torch.float32)
     y = torch.zeros(series_length, dtype=torch.float32)
     is_anomaly = torch.zeros(series_length, dtype=torch.bool)
     anomaly_type = [""] * series_length
-    anomalies: list[dict] = []
+    anomalies: list[dict[str, Any]] = []
 
     series = SyntheticSeries(
         x=x,
@@ -36,11 +44,19 @@ def test_synthetic_series_dataclass_initialization():
         ("sinusoidal", {"amplitude": 2.0, "frequency": 0.05}),
         ("exponential", {"initial_value": 1.0, "growth_rate": 0.02}),
         ("logarithmic", {"scale": 2.0, "shift": 1.0}),
-        ("periodic_seasonal", {"period": 12.0, "amplitude": 1.5, "waveform": "triangle"}),
+        (
+            "periodic_seasonal",
+            {"period": 12.0, "amplitude": 1.5, "waveform": "triangle"},
+        ),
     ],
 )
-def test_make_series_single_functions(function_type: str, params: dict):
-    """Verify make_series generates correct output shapes, types, and tags for base signals."""
+def test_make_series_single_functions(
+    function_type: str, params: dict[str, Any]
+) -> None:
+    """Verify make_series output structure for base signals.
+
+    Validates that generated output matches expected shapes, types, and anomaly tags.
+    """
     length = 100
     series = make_series(
         series_length=length,
@@ -57,7 +73,7 @@ def test_make_series_single_functions(function_type: str, params: dict):
     assert len(series.anomalies) == 0
 
 
-def test_make_series_noise_reproducibility():
+def test_make_series_noise_reproducibility() -> None:
     """Verify that random_state produces identical noisy outputs."""
     length = 100
     series_a = make_series(
@@ -76,11 +92,19 @@ def test_make_series_noise_reproducibility():
     assert torch.equal(series_a.y, series_b.y)
 
 
-def test_make_series_composite():
+def test_make_series_composite() -> None:
     """Verify composite multi-component weighted series generation."""
     components = [
-        {"function_type": "linear_trend", "function_params": {"slope": 0.1}, "weight": 1.0},
-        {"function_type": "sinusoidal", "function_params": {"frequency": 0.05}, "weight": 0.5},
+        {
+            "function_type": "linear_trend",
+            "function_params": {"slope": 0.1},
+            "weight": 1.0,
+        },
+        {
+            "function_type": "sinusoidal",
+            "function_params": {"frequency": 0.05},
+            "weight": 0.5,
+        },
     ]
 
     series = make_composite_series(

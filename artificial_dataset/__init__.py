@@ -34,13 +34,13 @@ from artificial_dataset._components import (
     logarithmic,
     periodic_seasonal,
     polynomial,
-    sinusoidal
+    sinusoidal,
 )
 from artificial_dataset.anomaly import (
     AnomalyDataset,
     AnomalySplits,
     SpikeParams,
-    make_anomaly_dataset
+    make_anomaly_dataset,
 )
 from artificial_dataset.classification import make_classification
 from artificial_dataset.injectors import (
@@ -52,7 +52,7 @@ from artificial_dataset.injectors import (
     add_spike_anomalies,
     add_trend_change,
     add_variance_change,
-    anomaly_summary
+    anomaly_summary,
 )
 from artificial_dataset.metrics import ClassifierMetrics
 from artificial_dataset.series import SyntheticSeries, make_series
@@ -84,5 +84,5 @@ __all__ = [
     "make_series",
     "periodic_seasonal",
     "polynomial",
-    "sinusoidal"
+    "sinusoidal",
 ]

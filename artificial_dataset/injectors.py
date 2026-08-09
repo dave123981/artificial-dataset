@@ -1,5 +1,5 @@
 """
-injectors.py
+Anomaly injectors for the base functions created with `make_series`.
 
 Provides labeled anomaly injectors for SyntheticSeries instances.
 All injectors accept a SyntheticSeries, perform a non-destructive copy,
@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+
 import torch
 import torch.nn.functional as F
 
 from artificial_dataset.series import SyntheticSeries
 
-
 # ---------- Internal Helpers ----------
+
 
 def _copy_series(series: SyntheticSeries) -> SyntheticSeries:
     """Create a deep copy of a SyntheticSeries to guarantee immutability."""
@@ -43,7 +44,7 @@ def _mark(series: SyntheticSeries, idx: torch.Tensor, tag: str) -> None:
             series.anomaly_type[i] = f"{curr}|{tag}"
 
 
-def _log(series: SyntheticSeries, entry: Dict[str, Any]) -> None:
+def _log(series: SyntheticSeries, entry: dict[str, Any]) -> None:
     """Append entry to the series anomaly audit log."""
     series.anomalies.append(entry)
 
@@ -51,7 +52,7 @@ def _log(series: SyntheticSeries, entry: Dict[str, Any]) -> None:
 def _resolve_indices(
     n: int,
     length: int,
-    existing_mask: Optional[torch.Tensor],
+    existing_mask: torch.Tensor | None,
     avoid_existing: bool,
     gen: torch.Generator,
 ) -> torch.Tensor:
@@ -63,7 +64,8 @@ def _resolve_indices(
 
     if n > len(pool):
         raise ValueError(
-            f"Requested {n} anomaly points, but only {len(pool)} available candidate indices."
+            f"Requested {n} anomaly points, but only {len(pool)} available candidate \
+                indices."
         )
 
     perm = torch.randperm(len(pool), generator=gen)
@@ -76,6 +78,8 @@ def _resolve_indices(
 # SpikeParams Dataclass
 @dataclass(frozen=True)
 class SpikeParams:
+    """Configuration parameters for generating synthetic spike anomalies."""
+
     amplitude_range: tuple[float, float] = (4.0, 7.0)
     width_range: tuple[int, int] = (3, 6)
     margin: int = 20
@@ -86,20 +90,22 @@ class SpikeParams:
 def add_point_anomalies(
     series: SyntheticSeries,
     n_anomalies: int = 5,
-    magnitude: Union[float, tuple[float, float]] = (3.0, 6.0),
+    magnitude: float | tuple[float, float] = (3.0, 6.0),
     direction: str = "both",
     avoid_existing: bool = True,
-    random_state: Optional[int] = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """Inject single-point spikes or dips."""
     series = _copy_series(series)
-    N = len(series)
+    series_length = len(series)
 
     gen = torch.Generator()
     if random_state is not None:
         gen.manual_seed(random_state)
 
-    idx = _resolve_indices(n_anomalies, N, series.is_anomaly, avoid_existing, gen)
+    idx = _resolve_indices(
+        n_anomalies, series_length, series.is_anomaly, avoid_existing, gen
+    )
     y_std = torch.std(series.y).item() or 1.0
 
     for i in idx:
@@ -126,8 +132,8 @@ def add_point_anomalies(
 def add_spike_anomalies(
     series: SyntheticSeries,
     n_anomalies: int = 5,
-    spike_params: Optional[SpikeParams] = None,
-    random_state: Optional[int] = None,
+    spike_params: SpikeParams | None = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """Inject triangular positive spike events."""
     series = _copy_series(series)
@@ -139,12 +145,17 @@ def add_spike_anomalies(
         gen.manual_seed(random_state)
 
     centres = torch.randint(
-        params.margin, max(params.margin + 1, t_len - params.margin), (n_anomalies,), generator=gen
+        params.margin,
+        max(params.margin + 1, t_len - params.margin),
+        (n_anomalies,),
+        generator=gen,
     )
 
     for centre in centres:
         c = centre.item()
-        w = torch.randint(params.width_range[0], params.width_range[1] + 1, (1,), generator=gen).item()
+        w = torch.randint(
+            params.width_range[0], params.width_range[1] + 1, (1,), generator=gen
+        ).item()
         idx = torch.arange(max(0, c - w), min(t_len, c + w + 1))
 
         profile = 1.0 - torch.abs(idx.float() - float(c)) / (w + 1.0)
@@ -164,7 +175,7 @@ def add_collective_anomaly(
     length: int = 20,
     pattern: str = "noise",
     magnitude: float = 3.0,
-    random_state: Optional[int] = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """Replace a subsequence with a collective anomaly pattern."""
     series = _copy_series(series)
@@ -180,7 +191,9 @@ def add_collective_anomaly(
     seg_std = torch.std(seg).item() or 1.0
 
     if pattern == "noise":
-        series.y[idx] = seg_mean + torch.randn(len(idx), generator=gen) * (magnitude * seg_std)
+        series.y[idx] = seg_mean + torch.randn(len(idx), generator=gen) * (
+            magnitude * seg_std
+        )
     elif pattern == "flat":
         series.y[idx] = seg_mean
     elif pattern == "reverse":
@@ -190,23 +203,36 @@ def add_collective_anomaly(
     elif pattern == "constant":
         series.y[idx] = magnitude
     else:
-        raise ValueError(f"Unknown pattern '{pattern}'. Choose from: noise, flat, reverse, scale, constant.")
+        raise ValueError(
+            f"Unknown pattern '{pattern}'. Choose from: noise, flat, reverse, scale, \
+                constant."
+        )
 
     _mark(series, idx, "collective")
-    _log(series, {"type": "collective", "start_idx": start_idx, "end_idx": end_idx, "pattern": pattern})
+    _log(
+        series,
+        {
+            "type": "collective",
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "pattern": pattern,
+        },
+    )
     return series
 
 
 def add_level_shift(
     series: SyntheticSeries,
     start_idx: int,
-    shift_magnitude: Union[float, tuple[float, float]] = (3.0, 5.0),
-    duration: Optional[int] = None,
-    random_state: Optional[int] = None,
+    shift_magnitude: float | tuple[float, float] = (3.0, 5.0),
+    duration: int | None = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """Apply a step shift in the mean value."""
     series = _copy_series(series)
-    end_idx = len(series) if duration is None else min(start_idx + duration, len(series))
+    end_idx = (
+        len(series) if duration is None else min(start_idx + duration, len(series))
+    )
     idx = torch.arange(start_idx, end_idx)
 
     gen = torch.Generator()
@@ -214,7 +240,11 @@ def add_level_shift(
         gen.manual_seed(random_state)
 
     if isinstance(shift_magnitude, tuple):
-        mag = shift_magnitude[0] + (shift_magnitude[1] - shift_magnitude[0]) * torch.rand(1, generator=gen).item()
+        mag = (
+            shift_magnitude[0]
+            + (shift_magnitude[1] - shift_magnitude[0])
+            * torch.rand(1, generator=gen).item()
+        )
     else:
         mag = shift_magnitude
 
@@ -231,19 +261,29 @@ def add_trend_change(
     series: SyntheticSeries,
     start_idx: int,
     new_slope: float,
-    duration: Optional[int] = None,
+    duration: int | None = None,
 ) -> SyntheticSeries:
     """Add a linear ramp changing local slope."""
     series = _copy_series(series)
-    N = len(series)
-    end_idx = N if duration is None else min(start_idx + duration, N)
+    series_length = len(series)
+    end_idx = (
+        series_length if duration is None else min(start_idx + duration, series_length)
+    )
     idx = torch.arange(start_idx, end_idx)
 
     ramp = new_slope * torch.arange(len(idx), dtype=torch.float32)
     series.y[idx] += ramp
 
     _mark(series, idx, "trend_change")
-    _log(series, {"type": "trend_change", "start_idx": start_idx, "end_idx": end_idx, "new_slope": new_slope})
+    _log(
+        series,
+        {
+            "type": "trend_change",
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "new_slope": new_slope,
+        },
+    )
     return series
 
 
@@ -252,7 +292,7 @@ def add_variance_change(
     start_idx: int,
     duration: int = 20,
     scale_factor: float = 4.0,
-    random_state: Optional[int] = None,
+    random_state: int | None = None,
 ) -> SyntheticSeries:
     """Inject extra Gaussian noise variance into a segment."""
     series = _copy_series(series)
@@ -268,7 +308,15 @@ def add_variance_change(
     series.y[idx] += noise
 
     _mark(series, idx, "variance_change")
-    _log(series, {"type": "variance_change", "start_idx": start_idx, "end_idx": end_idx, "scale_factor": scale_factor})
+    _log(
+        series,
+        {
+            "type": "variance_change",
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "scale_factor": scale_factor,
+        },
+    )
     return series
 
 
@@ -294,7 +342,10 @@ def add_dropout(
         raise ValueError("mode must be one of: flatline, zero, nan.")
 
     _mark(series, idx, "dropout")
-    _log(series, {"type": "dropout", "start_idx": start_idx, "end_idx": end_idx, "mode": mode})
+    _log(
+        series,
+        {"type": "dropout", "start_idx": start_idx, "end_idx": end_idx, "mode": mode},
+    )
     return series
 
 
@@ -305,7 +356,10 @@ def add_seasonal_distortion(
     mode: str = "stretch",
     factor: float = 2.0,
 ) -> SyntheticSeries:
-    """Distort periodic pattern via stretching, compressing, damping, or phase shifting."""
+    """Distort periodic pattern in a time series segment.
+
+    Applies distortion via stretching, compressing, damping, or phase shifting.
+    """
     series = _copy_series(series)
     end_idx = min(start_idx + duration, len(series))
     idx = torch.arange(start_idx, end_idx)
@@ -313,28 +367,44 @@ def add_seasonal_distortion(
     src_len = len(seg)
 
     if mode in ("stretch", "compress"):
-        warped_len = max(2, int(round(src_len * factor if mode == "stretch" else src_len / factor)))
+        warped_len = max(
+            2, round(src_len * factor if mode == "stretch" else src_len / factor)
+        )
         seg_reshaped = seg.view(1, 1, -1)
-        
+
         # Resample onto new grid, then interpolate back to original segment length
-        warped = F.interpolate(seg_reshaped, size=warped_len, mode="linear", align_corners=True)
-        resampled = F.interpolate(warped, size=src_len, mode="linear", align_corners=True)
+        warped = F.interpolate(
+            seg_reshaped, size=warped_len, mode="linear", align_corners=True
+        )
+        resampled = F.interpolate(
+            warped, size=src_len, mode="linear", align_corners=True
+        )
         series.y[idx] = resampled.squeeze()
     elif mode == "damp":
         seg_mean = torch.mean(seg)
         series.y[idx] = seg_mean + (seg - seg_mean) / factor
     elif mode == "phase_shift":
-        shift_val = int(round(factor))
+        shift_val = round(factor)
         series.y[idx] = torch.roll(seg, shifts=shift_val)
     else:
         raise ValueError("mode must be one of: stretch, compress, damp, phase_shift.")
 
     _mark(series, idx, "seasonal_distortion")
-    _log(series, {"type": "seasonal_distortion", "start_idx": start_idx, "end_idx": end_idx, "mode": mode, "factor": factor})
+    _log(
+        series,
+        {
+            "type": "seasonal_distortion",
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "mode": mode,
+            "factor": factor,
+        },
+    )
     return series
+
 
 # ---------- o ----------
 # Summary
-def anomaly_summary(series: SyntheticSeries) -> List[Dict[str, Any]]:
+def anomaly_summary(series: SyntheticSeries) -> list[dict[str, Any]]:
     """Return the audit log list stored in series.anomalies."""
     return series.anomalies
