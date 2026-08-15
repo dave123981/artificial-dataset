@@ -40,7 +40,7 @@ def test_synthetic_series_dataclass_initialization() -> None:
     "function_type, params",
     [
         ("constant", {"value": 3.5}),
-        ("linear_trend", {"slope": 0.5, "intercept": 1.0}),
+        ("linear", {"slope": 0.5, "intercept": 1.0}),
         ("sinusoidal", {"amplitude": 2.0, "frequency": 0.05}),
         ("exponential", {"initial_value": 1.0, "growth_rate": 0.02}),
         ("logarithmic", {"scale": 2.0, "shift": 1.0}),
@@ -96,7 +96,7 @@ def test_make_series_composite() -> None:
     """Verify composite multi-component weighted series generation."""
     components = [
         {
-            "function_type": "linear_trend",
+            "function_type": "linear",
             "function_params": {"slope": 0.1},
             "weight": 1.0,
         },
