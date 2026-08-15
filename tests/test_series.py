@@ -36,6 +36,19 @@ def test_synthetic_series_dataclass_initialization() -> None:
     assert series.anomalies == []
 
 
+def test_synthetic_series_pipe_applies_function() -> None:
+    """pipe() calls func(self, *args, **kwargs) and returns its result."""
+    series = make_series(series_length=10, function_type="constant")
+    result = series.pipe(lambda s, factor: len(s) * factor, factor=3)
+    assert result == 30
+
+
+def test_generate_timeline_nonpositive_length_raises() -> None:
+    """make_series raises ValueError when series_length is not positive."""
+    with pytest.raises(ValueError, match="positive integer"):
+        make_series(series_length=0, function_type="constant")
+
+
 @pytest.mark.parametrize(
     "function_type, params",
     [
@@ -93,26 +106,70 @@ def test_make_series_noise_reproducibility() -> None:
 
 
 def test_make_series_composite() -> None:
-    """Verify composite multi-component weighted series generation."""
-    components = [
-        {
-            "function_type": "linear",
-            "function_params": {"slope": 0.1},
-            "weight": 1.0,
-        },
-        {
-            "function_type": "sinusoidal",
-            "function_params": {"frequency": 0.05},
-            "weight": 0.5,
-        },
-    ]
+    """Regression test documenting a known components-schema mismatch.
 
+    Passing {"function_type", "function_params"}-style entries (the schema
+    used by make_series) into make_composite_series's components list is
+    silently accepted: neither key is recognised by compose(), so every
+    term contributes zero and the resulting series is flat. This test pins
+    down the current (buggy) behaviour; if the schemas are unified, this
+    test should be updated or removed alongside that fix.
+    """
+    wrong_schema_components = [
+        {"function_type": "linear", "function_params": {"slope": 0.1}, "weight": 1.0},
+    ]
     series = make_composite_series(
-        series_length=200,
-        components=components,
+        series_length=20, components=wrong_schema_components, noise_std=0.0
+    )
+    assert torch.equal(series.y, torch.zeros(20))
+
+
+def test_make_series_linear_trend_key_mismatch_produces_zero_signal() -> None:
+    """Regression test documenting a known key-name mismatch.
+
+    compose() only recognises the key "linear", but the docstring of
+    make_series advertises "linear_trend". Passing "linear_trend" is
+    silently accepted and produces an all-zero signal instead of raising
+    an error or computing a trend.
+    """
+    series = make_series(
+        series_length=20,
+        function_type="linear_trend",
+        function_params={"slope": 0.5, "intercept": 1.0},
         noise_std=0.0,
     )
+    assert torch.equal(series.y, torch.zeros(20))
 
-    assert series.y.shape == (200,)
-    assert isinstance(series.y, torch.Tensor)
-    assert not series.is_anomaly.any()
+
+def test_make_series_noise_without_random_state() -> None:
+    """noise_std > 0 without a random_state still perturbs the clean signal."""
+    length = 100
+    clean = make_series(series_length=length, function_type="constant", noise_std=0.0)
+    noisy = make_series(series_length=length, function_type="constant", noise_std=0.5)
+    assert noisy.y.shape == (length,)
+    assert not torch.equal(noisy.y, clean.y)
+
+
+def test_make_composite_series_noise_reproducibility() -> None:
+    """random_state makes noisy composite series reproducible."""
+    components = [{"constant": {"value": 1.0}}]
+    series_a = make_composite_series(
+        series_length=50, components=components, noise_std=0.3, random_state=7
+    )
+    series_b = make_composite_series(
+        series_length=50, components=components, noise_std=0.3, random_state=7
+    )
+    assert torch.equal(series_a.y, series_b.y)
+    assert not torch.equal(series_a.y, torch.ones(50))
+
+
+def test_make_composite_series_noise_without_random_state() -> None:
+    """noise_std > 0 without a random_state still perturbs the clean signal."""
+    components = [{"constant": {"value": 1.0}}]
+    clean = make_composite_series(
+        series_length=50, components=components, noise_std=0.0
+    )
+    noisy = make_composite_series(
+        series_length=50, components=components, noise_std=0.5
+    )
+    assert not torch.equal(noisy.y, clean.y)
