@@ -50,6 +50,44 @@ def test_add_point_anomalies(base_series: SyntheticSeries) -> None:
     assert modified.anomalies[0]["type"] == "point"
 
 
+def test_add_point_anomalies_without_avoiding_existing(
+    base_series: SyntheticSeries,
+) -> None:
+    """avoid_existing=False allows new point anomalies to reuse any index."""
+    series = add_level_shift(base_series, start_idx=0, duration=150, random_state=1)
+    modified = add_point_anomalies(
+        series, n_anomalies=3, avoid_existing=False, random_state=2
+    )
+    assert modified.is_anomaly.sum().item() == 150
+
+
+def test_resolve_indices_raises_when_pool_too_small(
+    base_series: SyntheticSeries,
+) -> None:
+    """Requesting more anomalies than available candidate indices raises."""
+    series = add_level_shift(base_series, start_idx=0, duration=150, random_state=1)
+    with pytest.raises(ValueError, match=r"only .* available"):
+        add_point_anomalies(series, n_anomalies=1, avoid_existing=True, random_state=2)
+
+
+def test_add_point_anomalies_direction_up(base_series: SyntheticSeries) -> None:
+    """direction='up' only injects positive-signed spikes."""
+    modified = add_point_anomalies(
+        base_series, n_anomalies=5, direction="up", random_state=3
+    )
+    idx = torch.where(modified.is_anomaly)[0]
+    assert torch.all(modified.y[idx] >= base_series.y[idx])
+
+
+def test_add_point_anomalies_direction_down(base_series: SyntheticSeries) -> None:
+    """direction='down' only injects negative-signed dips."""
+    modified = add_point_anomalies(
+        base_series, n_anomalies=5, direction="down", random_state=3
+    )
+    idx = torch.where(modified.is_anomaly)[0]
+    assert torch.all(modified.y[idx] <= base_series.y[idx])
+
+
 @pytest.mark.parametrize("pattern", ["noise", "flat", "reverse", "scale", "constant"])
 def test_add_collective_anomaly_patterns(
     base_series: SyntheticSeries, pattern: str
@@ -140,6 +178,19 @@ def test_injector_stacking_and_overlapping(base_series: SyntheticSeries) -> None
     assert isinstance(overlapped_tags, list)
 
 
+def test_mark_merges_distinct_overlapping_tags(base_series: SyntheticSeries) -> None:
+    """Overlapping anomalies with different tags are merged with '|'."""
+    series = add_level_shift(base_series, start_idx=10, duration=20, random_state=1)
+    # level_shift covers [10, 30); collective covers [25, 35) -> overlap [25, 30).
+    series = add_collective_anomaly(series, start_idx=25, length=10, pattern="flat")
+
+    overlapped = [series.anomaly_type[i] for i in range(25, 30)]
+    assert all("level_shift" in tag and "collective" in tag for tag in overlapped)
+    assert all(tag.count("|") == 1 for tag in overlapped)
+    assert series.anomaly_type[10] == "level_shift"
+    assert series.anomaly_type[34] == "collective"
+
+
 def test_anomaly_summary(base_series: SyntheticSeries) -> None:
     """Verify extraction of the audit trail log for stacked injectors."""
     series = add_collective_anomaly(
@@ -168,3 +219,25 @@ def test_zero_std_nan_regression_protection() -> None:
     # Should execute safely without producing NaN values or division by zero errors
     modified = add_point_anomalies(flat_series, n_anomalies=2, random_state=42)
     assert not torch.isnan(modified.y).any()
+
+
+def test_add_collective_anomaly_invalid_pattern_raises(
+    base_series: SyntheticSeries,
+) -> None:
+    """An unrecognised pattern name raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown pattern"):
+        add_collective_anomaly(base_series, start_idx=10, length=15, pattern="bogus")
+
+
+def test_add_dropout_invalid_mode_raises(base_series: SyntheticSeries) -> None:
+    """An unrecognised dropout mode raises ValueError."""
+    with pytest.raises(ValueError, match="mode must be one of"):
+        add_dropout(base_series, start_idx=10, duration=10, mode="bogus")
+
+
+def test_add_seasonal_distortion_invalid_mode_raises(
+    base_series: SyntheticSeries,
+) -> None:
+    """An unrecognised seasonal-distortion mode raises ValueError."""
+    with pytest.raises(ValueError, match="mode must be one of"):
+        add_seasonal_distortion(base_series, start_idx=30, duration=20, mode="bogus")
