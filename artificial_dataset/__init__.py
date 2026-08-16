@@ -54,8 +54,10 @@ from artificial_dataset.injectors import (
     add_variance_change,
     anomaly_summary,
 )
+from artificial_dataset.io import save_series
 from artificial_dataset.metrics import ClassifierMetrics
 from artificial_dataset.series import SyntheticSeries, make_series
+from artificial_dataset.visualize import plot_series
 
 __all__ = [
     "AnomalyDataset",
@@ -83,6 +85,8 @@ __all__ = [
     "make_classification",
     "make_series",
     "periodic_seasonal",
+    "plot_series",
     "polynomial",
+    "save_series",
     "sinusoidal",
 ]
