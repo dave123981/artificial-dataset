@@ -52,6 +52,23 @@ class SyntheticSeries:
         """Pass self to `func(self, *args, **kwargs)` and return the result."""
         return func(self, *args, **kwargs)
 
+    @property
+    def label(self) -> torch.Tensor:
+        """
+        Binary classification target derived from `is_anomaly`.
+
+        Returns
+        -------
+        torch.Tensor
+            Integer tensor of shape (T,), dtype `torch.long`. 1 at every
+            timestep flagged anomalous (`is_anomaly[i] == True`), 0
+            otherwise. For continuous anomalies (e.g. level shifts,
+            collective anomalies), every point in the affected span is
+            marked 1, since injectors already flag each index in the span
+            via `is_anomaly`.
+        """
+        return self.is_anomaly.to(torch.long)
+
 
 def _generate_timeline(length: int) -> torch.tensor:
     """Return the x axis: 0, 1, 2, ..., length - 1 (a.u., step size 1)."""
