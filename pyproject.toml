@@ -122,7 +122,7 @@ select = [
     "SIM",  # flake8-simplify — flags unnecessarily complex code
     "RUF",  # Ruff-specific rules
 ]
-ignore = []
+ignore = ["N812"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
@@ -136,3 +136,7 @@ convention = "numpy"
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+
+# .flake8 (for Flake8)
+[flake8]
+ignore = ["N812"]
