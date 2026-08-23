@@ -128,11 +128,90 @@ def test_add_level_shift(base_series: SyntheticSeries) -> None:
 
 
 def test_add_trend_change(base_series: SyntheticSeries) -> None:
-    """Verify slope break ramp injection."""
-    modified = add_trend_change(base_series, start_idx=40, new_slope=0.1, duration=20)
+    """Verify the segment is replaced by the requested trend shape."""
+    modified = add_trend_change(
+        base_series,
+        start_idx=40,
+        new_function_type="linear",
+        new_function_params={"slope": 0.1},
+        duration=20,
+    )
 
     assert torch.all(modified.is_anomaly[40:60])
     assert any("trend_change" in tag for tag in modified.anomaly_type)
+
+    # The segment should now follow a linear trend with slope 0.1: after
+    # removing the continuity offset, consecutive differences equal the slope.
+    seg = modified.y[40:60]
+    diffs = seg[1:] - seg[:-1]
+    assert torch.allclose(diffs, torch.full_like(diffs, 0.1), atol=1e-5)
+
+
+def test_add_trend_change_continuity_matches_boundary(
+    base_series: SyntheticSeries,
+) -> None:
+    """continuity=True anchors the new trend to the pre-anomaly value."""
+    modified = add_trend_change(
+        base_series,
+        start_idx=40,
+        new_function_type="linear",
+        new_function_params={"slope": 0.1},
+        duration=20,
+        continuity=True,
+    )
+
+    assert torch.isclose(modified.y[40], base_series.y[39], atol=1e-5)
+
+
+def test_add_trend_change_without_continuity_uses_raw_trend(
+    base_series: SyntheticSeries,
+) -> None:
+    """continuity=False evaluates the new trend without boundary matching."""
+    modified = add_trend_change(
+        base_series,
+        start_idx=40,
+        new_function_type="constant",
+        new_function_params={"value": 0.0},
+        duration=20,
+        continuity=False,
+    )
+
+    assert torch.all(modified.y[40:60] == 0.0)
+
+
+def test_add_trend_change_default_duration_extends_to_series_end(
+    base_series: SyntheticSeries,
+) -> None:
+    """Omitting duration extends the trend change to the end of the series."""
+    modified = add_trend_change(
+        base_series, start_idx=100, new_function_type="sinusoidal"
+    )
+
+    assert torch.all(modified.is_anomaly[100:])
+    assert not modified.is_anomaly[:100].any()
+
+
+def test_add_trend_change_at_series_start_skips_continuity(
+    base_series: SyntheticSeries,
+) -> None:
+    """start_idx=0 has no prior value, so the raw trend is used as-is."""
+    modified = add_trend_change(
+        base_series,
+        start_idx=0,
+        new_function_type="linear",
+        new_function_params={"slope": 0.0, "intercept": 5.0},
+        duration=10,
+    )
+
+    assert torch.all(modified.y[0:10] == 5.0)
+
+
+def test_add_trend_change_invalid_function_type_raises(
+    base_series: SyntheticSeries,
+) -> None:
+    """An unrecognised trend shape name raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown new_function_type"):
+        add_trend_change(base_series, start_idx=40, new_function_type="bogus")
 
 
 def test_add_variance_change(base_series: SyntheticSeries) -> None:

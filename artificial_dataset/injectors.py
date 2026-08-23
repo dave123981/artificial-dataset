@@ -15,7 +15,21 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from artificial_dataset._components import compose
 from artificial_dataset.series import SyntheticSeries
+
+# Trend shapes recognised by `add_trend_change`, mirroring the keys understood
+# by `artificial_dataset._components.compose`.
+_KNOWN_TREND_TYPES = (
+    "constant",
+    "linear",
+    "exponential",
+    "logarithmic",
+    "periodic_seasonal",
+    "polynomial",
+    "sinusoidal",
+)
+
 
 # ---------- Internal Helpers ----------
 
@@ -260,10 +274,74 @@ def add_level_shift(
 def add_trend_change(
     series: SyntheticSeries,
     start_idx: int,
-    new_slope: float,
+    new_function_type: str,  # "constant" | "linear" | "exponential" |
+    # "logarithmic" | "periodic_seasonal" |
+    # "polynomial" | "sinusoidal"
+    new_function_params: dict[str, Any] | None = None,
     duration: int | None = None,
+    continuity: bool = True,
 ) -> SyntheticSeries:
-    """Add a linear ramp changing local slope."""
+    """Replace a segment's trend with a different known trend shape.
+
+    Simulates a concept-drift-style anomaly: over ``[start_idx, end_idx)`` the
+    series stops following its original generative shape (e.g. sinusoidal)
+    and instead follows *new_function_type*, evaluated with
+    *new_function_params*, on the segment's own time values. The new shape is
+    computed by :func:`~artificial_dataset._components.compose`, so any
+    single component recognised there (with all of its own parameters) can be
+    used as the anomalous trend.
+
+    Parameters
+    ----------
+    series : SyntheticSeries
+        The base series to modify.
+    start_idx : int
+        Index (inclusive) where the trend change begins.
+    new_function_type : str
+        Name of the replacement trend shape. One of: constant, linear,
+        exponential, logarithmic, periodic_seasonal, polynomial, sinusoidal.
+    new_function_params : dict, optional
+        Keyword arguments forwarded to the chosen trend function (e.g.
+        ``{"slope": 0.5, "intercept": 0.0}`` for ``"linear"``). Defaults to
+        that function's own defaults when omitted.
+    duration : int, optional
+        Length of the affected segment. Defaults to the rest of the series.
+    continuity : bool, default True
+        If True, the new trend is vertically shifted so its first value
+        matches the series value immediately before *start_idx*, avoiding an
+        artificial level jump at the boundary while still exposing the
+        change in shape/slope. If False, the new trend is used exactly as
+        computed, which may introduce a visible jump.
+
+    Returns
+    -------
+    SyntheticSeries
+        A new series with the segment's trend replaced.
+
+    Raises
+    ------
+    ValueError
+        If *new_function_type* is not a recognised trend shape.
+
+    Examples
+    --------
+    >>> from artificial_dataset.series import make_series
+    >>> base = make_series(
+    ...     200, "sinusoidal", {"amplitude": 2.0, "frequency": 0.05}
+    ... )
+    >>> anomalous = add_trend_change(
+    ...     base, start_idx=100, new_function_type="linear",
+    ...     new_function_params={"slope": 0.05}, duration=50,
+    ... )
+    >>> bool(anomalous.is_anomaly[100:150].all())
+    True
+    """
+    if new_function_type not in _KNOWN_TREND_TYPES:
+        raise ValueError(
+            f"Unknown new_function_type '{new_function_type}'. Choose from: "
+            f"{', '.join(_KNOWN_TREND_TYPES)}."
+        )
+
     series = _copy_series(series)
     series_length = len(series)
     end_idx = (
@@ -271,8 +349,14 @@ def add_trend_change(
     )
     idx = torch.arange(start_idx, end_idx)
 
-    ramp = new_slope * torch.arange(len(idx), dtype=torch.float32)
-    series.y[idx] += ramp
+    params = {new_function_type: new_function_params or {}}
+    new_values = compose(series.x[idx], params)
+
+    if continuity and start_idx > 0:
+        offset = series.y[start_idx - 1] - new_values[0]
+        new_values = new_values + offset
+
+    series.y[idx] = new_values
 
     _mark(series, idx, "trend_change")
     _log(
@@ -281,7 +365,9 @@ def add_trend_change(
             "type": "trend_change",
             "start_idx": start_idx,
             "end_idx": end_idx,
-            "new_slope": new_slope,
+            "new_function_type": new_function_type,
+            "new_function_params": new_function_params or {},
+            "continuity": continuity,
         },
     )
     return series
