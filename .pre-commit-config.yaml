@@ -32,17 +32,8 @@ repos:
     rev: v0.15.12
     hooks:
       - id: ruff-format # This runs `ruff format`
-      - id: ruff-check  # This runs `ruff check`
+      - id: ruff-check  # This runs `ruff check` (notebooks included natively)
         args: ["--fix"]
-        exclude: \.ipynb$ # We have individual config for that see line 39
-
-  # --- Ruff on notebooks ---
-  - repo: https://github.com/nbQA-dev/nbQA
-    rev: 1.9.1
-    hooks:
-      - id: nbqa-ruff
-        additional_dependencies: [ruff]
-        args: ["--extend-ignore=D100"]
 
   # --- Mypy (type checking) ---
   - repo: https://github.com/pre-commit/mirrors-mypy
