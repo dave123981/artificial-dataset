@@ -5,8 +5,10 @@ from typing import Any
 import pytest
 import torch
 
+from artificial_dataset.injectors import add_level_shift, add_point_anomalies
 from artificial_dataset.series import (
     SyntheticSeries,
+    SyntheticSeriesSplits,
     make_composite_series,
     make_series,
 )
@@ -173,3 +175,98 @@ def test_make_composite_series_noise_without_random_state() -> None:
         series_length=50, components=components, noise_std=0.5
     )
     assert not torch.equal(noisy.y, clean.y)
+
+
+def test_split_along_time_axis() -> None:
+    """A split cuts the timeline into contiguous, recombinable segments."""
+    series = make_series(
+        series_length=256,
+        function_type="sinusoidal",
+        function_params={"amplitude": 1.0, "frequency": 0.05},
+        noise_std=0.0,
+    )
+    splits = series.split((0.5, 0.25, 0.25))
+
+    assert isinstance(splits, SyntheticSeriesSplits)
+    assert len(splits.train) == 128
+    assert len(splits.val) == 64
+    assert len(splits.test) == 64
+
+    recombined = torch.cat([splits.train.y, splits.val.y, splits.test.y])
+    assert torch.equal(recombined, series.y)
+
+
+def test_split_rebases_point_anomaly_indices() -> None:
+    """Point-style 'indices' entries are filtered and re-based per segment."""
+    series = make_series(series_length=100, function_type="constant")
+    series = add_point_anomalies(series, n_anomalies=3, random_state=5)
+
+    splits = series.split((0.5, 0.3, 0.2))
+    for subset in (splits.train, splits.val, splits.test):
+        for entry in subset.anomalies:
+            if entry["type"] != "point":
+                continue
+            assert all(0 <= i < len(subset) for i in entry["indices"])
+            assert torch.all(subset.is_anomaly[entry["indices"]])
+
+    total_indices = sum(
+        len(entry["indices"])
+        for subset in (splits.train, splits.val, splits.test)
+        for entry in subset.anomalies
+        if entry["type"] == "point"
+    )
+    assert total_indices == series.is_anomaly.sum().item()
+
+
+def test_split_clips_span_anomaly_crossing_a_boundary() -> None:
+    """A start_idx/end_idx span crossing a split boundary is clipped in both."""
+    series = make_series(series_length=100, function_type="constant")
+    series = add_level_shift(series, start_idx=40, duration=20, random_state=1)
+
+    splits = series.split((0.5, 0.25, 0.25))  # boundaries at 50 and 75
+
+    train_entry = next(e for e in splits.train.anomalies if e["type"] == "level_shift")
+    assert train_entry["start_idx"] == 40
+    assert train_entry["end_idx"] == 50
+
+    val_entry = next(e for e in splits.val.anomalies if e["type"] == "level_shift")
+    assert val_entry["start_idx"] == 0
+    assert val_entry["end_idx"] == 10
+
+    assert all(e["type"] != "level_shift" for e in splits.test.anomalies)
+
+
+def test_split_drops_entries_entirely_outside_window() -> None:
+    """An anomaly confined to one segment doesn't leak into the others."""
+    series = make_series(series_length=100, function_type="constant")
+    series = add_level_shift(series, start_idx=5, duration=10, random_state=1)
+
+    splits = series.split((0.5, 0.25, 0.25))
+    assert any(e["type"] == "level_shift" for e in splits.train.anomalies)
+    assert not any(e["type"] == "level_shift" for e in splits.val.anomalies)
+    assert not any(e["type"] == "level_shift" for e in splits.test.anomalies)
+
+
+def test_split_method_matches_manual_slicing() -> None:
+    """split() partitions y, x, and is_anomaly consistently with manual slicing."""
+    series = make_series(series_length=200, function_type="linear")
+    splits = series.split((0.5, 0.3, 0.2))
+
+    assert torch.equal(splits.train.y, series.y[:100])
+    assert torch.equal(splits.val.x, series.x[100:160])
+    assert torch.equal(splits.test.is_anomaly, series.is_anomaly[160:])
+
+
+def test_invalid_split_fractions_raises() -> None:
+    """ValueError is raised when split fractions do not sum to one."""
+    series = make_series(series_length=50, function_type="constant")
+    with pytest.raises(ValueError, match="sum to 1"):
+        series.split((0.5, 0.2, 0.2))
+
+
+def test_split_unrecognised_anomaly_schema_raises() -> None:
+    """An anomaly log entry without 'indices' or 'start_idx'/'end_idx' raises."""
+    series = make_series(series_length=50, function_type="constant")
+    series.anomalies.append({"type": "mystery"})
+    with pytest.raises(ValueError, match="Cannot split anomaly log entry"):
+        series.split((0.5, 0.3, 0.2))
