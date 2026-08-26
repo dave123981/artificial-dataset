@@ -56,7 +56,11 @@ from artificial_dataset.injectors import (
 )
 from artificial_dataset.io import save_series
 from artificial_dataset.metrics import ClassifierMetrics
-from artificial_dataset.series import SyntheticSeries, make_series
+from artificial_dataset.series import (
+    SyntheticSeries,
+    SyntheticSeriesSplits,
+    make_series,
+)
 from artificial_dataset.visualize import plot_series
 
 __all__ = [
@@ -65,6 +69,7 @@ __all__ = [
     "ClassifierMetrics",
     "SpikeParams",
     "SyntheticSeries",
+    "SyntheticSeriesSplits",
     "add_collective_anomaly",
     "add_dropout",
     "add_level_shift",

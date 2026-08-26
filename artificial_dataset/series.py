@@ -6,6 +6,7 @@ generating synthetic 1D time series datasets.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -68,6 +69,127 @@ class SyntheticSeries:
             via `is_anomaly`.
         """
         return self.is_anomaly.to(torch.long)
+
+    def split(self, fractions: tuple[float, float, float]) -> SyntheticSeriesSplits:
+        """Split the series along the time axis into train, val, and test.
+
+        The timeline is partitioned contiguously *from the beginning*: the
+        first ``fractions[0]`` of the ``T`` timesteps go to ``train``, the
+        next ``fractions[1]`` to ``val``, and the remainder to ``test``.
+        Each subset's ``anomalies`` audit-log entries are clipped to that
+        window and re-based to local sample positions; entries that fall
+        entirely outside the window are dropped.
+
+        Parameters
+        ----------
+        fractions : tuple[float, float, float]
+            ``(train, val, test)`` fractions; must sum to ``1`` (within a
+            small tolerance).
+
+        Returns
+        -------
+        SyntheticSeriesSplits
+            The three contiguous time segments, each a :class:`SyntheticSeries`.
+
+        Raises
+        ------
+        ValueError
+            If the fractions do not sum to ``1``.
+        """
+        f_train, f_val, f_test = fractions
+        if abs(f_train + f_val + f_test - 1.0) > 1e-6:
+            raise ValueError(f"fractions must sum to 1, got {fractions}")
+
+        t_len = len(self)
+        n_train = round(f_train * t_len)
+        n_val = round(f_val * t_len)
+
+        def _subset(lo: int, hi: int) -> SyntheticSeries:
+            return SyntheticSeries(
+                x=self.x[lo:hi],
+                y=self.y[lo:hi],
+                is_anomaly=self.is_anomaly[lo:hi],
+                anomaly_type=self.anomaly_type[lo:hi],
+                anomalies=_rebase_anomalies(self.anomalies, lo, hi),
+                meta=copy.deepcopy(self.meta),
+            )
+
+        return SyntheticSeriesSplits(
+            train=_subset(0, n_train),
+            val=_subset(n_train, n_train + n_val),
+            test=_subset(n_train + n_val, t_len),
+        )
+
+
+@dataclass
+class SyntheticSeriesSplits:
+    """Train/validation/test partition of a :class:`SyntheticSeries`.
+
+    Attributes
+    ----------
+    train, val, test : SyntheticSeries
+        The three disjoint time segments, cut contiguously from the
+        beginning of the timeline.
+    """
+
+    train: SyntheticSeries
+    val: SyntheticSeries
+    test: SyntheticSeries
+
+
+def _rebase_anomalies(
+    anomalies: list[dict[str, Any]], lo: int, hi: int
+) -> list[dict[str, Any]]:
+    """Clip and re-base every anomaly audit-log entry to a ``[lo, hi)`` window.
+
+    Entries with an ``"indices"`` key (used by point and spike anomalies)
+    keep only the indices that fall inside the window. Entries with both
+    ``"start_idx"`` and ``"end_idx"`` keys (used by every span-style
+    injector, e.g. level shifts, trend changes, dropout) are clipped to the
+    window. Entries that fall entirely outside the window are dropped from
+    the result.
+
+    Parameters
+    ----------
+    anomalies : list[dict[str, Any]]
+        The full audit log, as stored on :attr:`SyntheticSeries.anomalies`.
+    lo, hi : int
+        Half-open ``[lo, hi)`` window, in original sample positions.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Re-based entries whose support overlaps the window, in their
+        original relative order.
+
+    Raises
+    ------
+    ValueError
+        If an entry has neither an ``"indices"`` key nor both ``"start_idx"``
+        and ``"end_idx"`` keys, since its extent can't be determined.
+    """
+    rebased: list[dict[str, Any]] = []
+    for original_entry in anomalies:
+        entry = copy.deepcopy(original_entry)
+        if "indices" in entry:
+            indices = [i - lo for i in entry["indices"] if lo <= i < hi]
+            if not indices:
+                continue
+            entry["indices"] = indices
+        elif "start_idx" in entry and "end_idx" in entry:
+            start = max(entry["start_idx"], lo)
+            end = min(entry["end_idx"], hi)
+            if start >= end:
+                continue
+            entry["start_idx"] = start - lo
+            entry["end_idx"] = end - lo
+        else:
+            raise ValueError(
+                f"Cannot split anomaly log entry {entry!r}: expected an "
+                "'indices' key or both 'start_idx' and 'end_idx' keys."
+            )
+        rebased.append(entry)
+    return rebased
 
 
 def _generate_timeline(length: int) -> torch.tensor:
