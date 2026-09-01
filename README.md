@@ -30,6 +30,11 @@ git clone git@github.com:dcintlab/artificial-dataset.git
 cd artificial-dataset
 pip install -e .
 ```
+Install directly from Github.
+
+```bash
+pip install git+https://github.com/intensivedatacomp/artificial-dataset.git
+```
 
 ## Quick start
 
